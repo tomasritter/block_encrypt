@@ -1,0 +1,12 @@
+[package]
+name = "block_encrypt"
+version = "0.1.0"
+authors = ["Tomas Ritter <tomas.ritter1@gmail.com>"]
+
+[lib]
+name = "block_encrypt"
+path = "src/lib.rs"
+
+[dependencies]
+redox_syscall = "0.1"
+redoxfs = "0.3"
