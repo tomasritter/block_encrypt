@@ -3,6 +3,7 @@ extern crate redoxfs;
 extern crate block_modes;
 extern crate aes_soft as aes;
 extern crate typenum;
+//extern crate openssl;
 #[macro_use] extern crate hex_literal;
 #[macro_use] extern crate generic_array;
 
@@ -11,8 +12,12 @@ mod ciphers;
 use block_modes::{BlockMode, Cbc, Ecb, Pcbc};
 use block_modes::block_padding::ZeroPadding;
 use aes::{Aes128, Aes192, Aes256};
-use ciphers::{Cipher, RustCipher};
+use ciphers::Cipher;
+use self::ciphers::RustCipher;
+//use self::ciphers::OpenSSLCipher; TODO: Figure out how to compile with openssl?
 use typenum::{U16, U24, U32};
+
+//use openssl::symm::Cipher as OpenSSLCipherOption;
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write, Seek, SeekFrom};
@@ -59,16 +64,18 @@ impl BlockEncrypt {
                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f];
         let iv16 = arr![u8; 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff];
 
+        // TODO: Add more ciphers from block_modes
         let cipher = match cipher_str {
-            "aes128cbc" =>  Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv16)) as Box<dyn Cipher>,
-            "aes192cbc" =>  Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv16)) as Box<dyn Cipher>,
-            "aes256cbc" =>  Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>,
-            "aes128ecb" =>  Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(key16, iv16)) as Box<dyn Cipher>,
-            "aes192ecb" =>  Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(key24, iv16)) as Box<dyn Cipher>,
-            "aes256ecb" =>  Box::new(RustCipher::<Aes256, Ecb<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>,
-            "aes128pcbc" => Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv16)) as Box<dyn Cipher>,
-            "aes192pcbc" => Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv16)) as Box<dyn Cipher>,
-            "aes256pcbc" => Box::new(RustCipher::<Aes256, Pcbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>,
+            "rust-aes128cbc" =>  Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv16)) as Box<dyn Cipher>,
+            "rust-aes192cbc" =>  Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv16)) as Box<dyn Cipher>,
+            "rust-aes256cbc" =>  Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>,
+            "rust-aes128ecb" =>  Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(key16, iv16)) as Box<dyn Cipher>,
+            "rust-aes192ecb" =>  Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(key24, iv16)) as Box<dyn Cipher>,
+            "rust-aes256ecb" =>  Box::new(RustCipher::<Aes256, Ecb<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>,
+            "rust-aes128pcbc" => Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv16)) as Box<dyn Cipher>,
+            "rust-aes192pcbc" => Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv16)) as Box<dyn Cipher>,
+            "rust-aes256pcbc" => Box::new(RustCipher::<Aes256, Pcbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>,
+            //"openssl-aes128ecb" => Box::new(OpenSSLCipher::<U16,U16>::create(OpenSSLCipherOption::aes_128_ecb(), key16, iv16)) as Box<dyn Cipher>,
             _ => Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv16)) as Box<dyn Cipher>
         };
 

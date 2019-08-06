@@ -16,3 +16,4 @@ aes-soft = "0.3.3"
 block-cipher-trait="0.6.2"
 generic-array = "0.13.2"
 typenum = "1.10.0"
+#openssl = { version = "0.10", features = ["vendored"] }
