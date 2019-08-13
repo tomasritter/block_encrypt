@@ -1,3 +1,6 @@
+#![crate_name="block_encrypt"]
+#![crate_type="lib"]
+
 extern crate syscall;
 extern crate redoxfs;
 extern crate block_modes;
@@ -23,7 +26,7 @@ use syscall::error::{Error, Result, EIO};
 use std::vec::Vec;
 use std::boxed::Box;
 
-use redoxfs::BLOCK_SIZE;
+use redoxfs::{Disk, BLOCK_SIZE};
 
 macro_rules! try_disk {
     ($expr:expr) => (match $expr {
@@ -41,20 +44,20 @@ pub struct BlockEncrypt {
 }
 
 impl BlockEncrypt {
-    pub fn open(path: &str, cipher : &str, ivgen : &str) -> Result<BlockEncrypt> {
+    pub fn open(path: &str, cipher: &str, ivgen: &str) -> Result<BlockEncrypt> {
         println!("Open BlockEncrypt {} ", path);
         let file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
         Self::create_block_encrypt(file, cipher, ivgen)
     }
 
-    pub fn create(path: &str, size: u64, cipher : &str, ivgen : &str) -> Result<BlockEncrypt>  {
+    pub fn create(path: &str, size: u64, cipher: &str, ivgen: &str) -> Result<BlockEncrypt> {
         println!("Create BlockEncrypt {}", path);
         let file = try_disk!(OpenOptions::new().read(true).write(true).create(true).open(path));
         try_disk!(file.set_len(size));
-        Self::create_block_encrypt(file , cipher, ivgen)
+        Self::create_block_encrypt(file, cipher, ivgen)
     }
 
-    fn create_block_encrypt(file : File, cipher_str : &str, iv_str : &str) -> Result<BlockEncrypt> {
+    fn create_block_encrypt(file: File, cipher_str: &str, iv_str: &str) -> Result<BlockEncrypt> {
         let key16 = arr![u8; 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
         let key24 = arr![u8; 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                              0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17];
@@ -64,12 +67,12 @@ impl BlockEncrypt {
 
         // TODO: Add more ciphers from block_modes
         let cipher = match cipher_str {
-            "rust-aes128cbc" =>  Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv_str)) as Box<dyn Cipher>,
-            "rust-aes192cbc" =>  Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv_str)) as Box<dyn Cipher>,
-            "rust-aes256cbc" =>  Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv_str)) as Box<dyn Cipher>,
-            "rust-aes128ecb" =>  Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(key16, iv_str)) as Box<dyn Cipher>,
-            "rust-aes192ecb" =>  Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(key24, iv_str)) as Box<dyn Cipher>,
-            "rust-aes256ecb" =>  Box::new(RustCipher::<Aes256, Ecb<Aes256, ZeroPadding>, U32, U16>::create(key32, iv_str)) as Box<dyn Cipher>,
+            "rust-aes128cbc" => Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv_str)) as Box<dyn Cipher>,
+            "rust-aes192cbc" => Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv_str)) as Box<dyn Cipher>,
+            "rust-aes256cbc" => Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv_str)) as Box<dyn Cipher>,
+            "rust-aes128ecb" => Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(key16, iv_str)) as Box<dyn Cipher>,
+            "rust-aes192ecb" => Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(key24, iv_str)) as Box<dyn Cipher>,
+            "rust-aes256ecb" => Box::new(RustCipher::<Aes256, Ecb<Aes256, ZeroPadding>, U32, U16>::create(key32, iv_str)) as Box<dyn Cipher>,
             "rust-aes128pcbc" => Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>, U16, U16>::create(key16, iv_str)) as Box<dyn Cipher>,
             "rust-aes192pcbc" => Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>, U24, U16>::create(key24, iv_str)) as Box<dyn Cipher>,
             "rust-aes256pcbc" => Box::new(RustCipher::<Aes256, Pcbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv_str)) as Box<dyn Cipher>,
@@ -77,15 +80,17 @@ impl BlockEncrypt {
             _ => Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(key32, iv_str)) as Box<dyn Cipher>
         };
 
-        Ok (
+        Ok(
             BlockEncrypt {
                 file,
                 cipher
             }
         )
     }
+}
 
-    pub fn read_at(&mut self, block: u64, buffer: &mut [u8]) -> Result<usize> {
+impl Disk for BlockEncrypt {
+    fn read_at(&mut self, block: u64, buffer: &mut [u8]) -> Result<usize> {
         println!("BlockEncrypt file read at {}", block);
         try_disk!(self.file.seek(SeekFrom::Start(block * BLOCK_SIZE)));
 
@@ -102,7 +107,7 @@ impl BlockEncrypt {
         Ok(count)
     }
 
-    pub fn write_at(&mut self, block: u64, buffer: &[u8]) -> Result<usize> {
+    fn write_at(&mut self, block: u64, buffer: &[u8]) -> Result<usize> {
         println!("BlockEncrypt file write at {}", block);
         try_disk!(self.file.seek(SeekFrom::Start(block * BLOCK_SIZE)));
 
@@ -115,7 +120,7 @@ impl BlockEncrypt {
         Ok(count)
     }
 
-    pub fn size(&mut self) -> Result<u64> {
+    fn size(&mut self) -> Result<u64> {
         let size = try_disk!(self.file.seek(SeekFrom::End(0)));
         Ok(size)
     }
