@@ -12,6 +12,7 @@ use self::block_cipher_trait::{BlockCipher};
 use std::marker::PhantomData;
 use self::generic_array::{GenericArray, ArrayLength};
 use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull};
+use header::IVGeneratorEnum;
 
 
 // !!!TODO: Check whether size of key and iv arrays can be somehow precomputed from BC: BlockCipher type with some magic/already in crate
@@ -20,8 +21,8 @@ pub struct RustCipher<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>, KeyLengt
         BC: BlockCipher<KeySize = KeyLength, BlockSize = IVLength>,
         <BC as BlockCipher>::ParBlocks: ArrayLength<GenericArray<u8, IVLength>>
 {
-    key : GenericArray<u8, KeyLength>, // TODO: Change to native const generics if they become available in my lifetime
-    iv_generator : Box<dyn IVGenerator<IVLength>>,
+    key : GenericArray<u8, KeyLength>,
+    iv_generator : Box<dyn IVGenerator<IVLength>>, // TODO: Try to get static dispatch working
     cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
 }
@@ -32,19 +33,20 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>, KeyLength : 's
         <BC as BlockCipher>::ParBlocks: ArrayLength<GenericArray<u8, IVLength>>
 {
     // TODO: Probably change arguments to Vec with some asserts about the size of it? Will see after salting of key
-    pub fn create(key : GenericArray<u8, KeyLength>, iv_str : &str) -> Self {
-        let iv_generator = if iv_str.starts_with("essiv") {
-            Box::new(IVEssiv::<BC, KeyLength, IVLength>::create(&key, iv_str))
-        } else {
-            match iv_str {
-                "plain" => Box::new(IVPlain::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>,
-                "plainbe" => Box::new(IVPlainBe::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>,
-                _ => Box::new(IVNull::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>
-            }
+    pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
+        let mut gen_key : GenericArray<u8, KeyLength> = Default::default();
+        assert!(key.len() == gen_key.len());
+        gen_key[..key.len()].copy_from_slice(key);
+
+        let iv_generator = match iv_generator_type {
+            IVGeneratorEnum::Plain => Box::new(IVPlain::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>,
+            IVGeneratorEnum::PlainBE => Box::new(IVPlainBe::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>,
+            IVGeneratorEnum::Null => Box::new(IVNull::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>,
+            _ => Box::new(IVEssiv::<BC, KeyLength, IVLength>::create(&gen_key, iv_generator_type))
         };
 
         RustCipher::<BC, C, KeyLength, IVLength> {
-            key,
+            key: gen_key,
             iv_generator,
             cipher_type : PhantomData,
             cipher_impl : PhantomData

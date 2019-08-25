@@ -20,6 +20,7 @@ use self::sha3::{Sha3_256, Sha3_512};
 use self::groestl::{Groestl256};
 use self::block_cipher_trait::BlockCipher;
 use typenum::U1;
+use header::IVGeneratorEnum;
 
 pub trait IVGenerator<IVLength : ArrayLength<u8>> {
     fn getiv(&self, block : u64) -> GenericArray<u8, IVLength>;
@@ -96,21 +97,19 @@ impl <Cipher, KeyLength: ArrayLength<u8>, IVLength : ArrayLength<u8>> IVEssiv<Ci
         Cipher: BlockCipher<KeySize = KeyLength, BlockSize = IVLength>,
         <Cipher as BlockCipher>::ParBlocks: ArrayLength<GenericArray<u8, IVLength>>
 {
-    pub fn create(key : &GenericArray<u8, KeyLength>, ivgen_str : &str) -> Self {
-        let mut split = ivgen_str.splitn(2, ':');
+    pub fn create(key : &GenericArray<u8, KeyLength>, essiv_generator : &IVGeneratorEnum) -> Self {
         let mut hashed_key : GenericArray<u8, KeyLength> = Default::default();
         let length = KeyLength::to_usize();
-        let essiv = split.next().unwrap();
-        match split.next().unwrap() {
-            "sha2-256" => { hashed_key[..length].copy_from_slice(&Sha256::digest(key)); },
-            "sha2-512" => { hashed_key[..length].copy_from_slice(&Sha512::digest(key)); },
-            "sha3-256" => { hashed_key[..length].copy_from_slice(&Sha3_256::digest(key)); },
-            "sha3-512" => { hashed_key[..length].copy_from_slice(&Sha3_512::digest(key)); },
+        match essiv_generator {
+            IVGeneratorEnum::EssivSha2_256 => { hashed_key[..length].copy_from_slice(&Sha256::digest(key)); },
+            IVGeneratorEnum::EssivSha2_512 => { hashed_key[..length].copy_from_slice(&Sha512::digest(key)); },
+            IVGeneratorEnum::EssivSha3_256 => { hashed_key[..length].copy_from_slice(&Sha3_256::digest(key)); },
+            IVGeneratorEnum::EssivSha3_512 => { hashed_key[..length].copy_from_slice(&Sha3_512::digest(key)); },
             // TODO: Try to do it without cutting off the end for Blake and Groestl since they should be variable length hashes
-            "blake2b" => { hashed_key[..length].copy_from_slice(&Blake2b::digest(key)); },
-            "blake2s" => { hashed_key[..length].copy_from_slice(&Blake2s::digest(key)); },
-            "groestl" => { hashed_key[..length].copy_from_slice(&Groestl256::digest(key)); },
-            _ => { hashed_key[..length].copy_from_slice(&Groestl256::digest(key)); } // TODO: ERROR HANDLING
+            IVGeneratorEnum::EssivBlake2b => { hashed_key[..length].copy_from_slice(&Blake2b::digest(key)); },
+            IVGeneratorEnum::EssivBlake2s => { hashed_key[..length].copy_from_slice(&Blake2s::digest(key)); },
+            IVGeneratorEnum::EssivGroestl => { hashed_key[..length].copy_from_slice(&Groestl256::digest(key)); },
+            _ => assert!(false)
         };
 
         IVEssiv::<Cipher, KeyLength, IVLength> {

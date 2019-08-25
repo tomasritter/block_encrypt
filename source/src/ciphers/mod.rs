@@ -4,10 +4,13 @@ pub use self::ivgenerators::IVPlain;
 pub use self::ivgenerators::IVPlainBe;
 pub use self::ivgenerators::IVNull;
 pub use self::ivgenerators::IVEssiv;
+pub use self::keyderiv::Argon2;
+pub use self::keyderiv::KeyDerivationFunction;
 //pub use self::openssl::OpenSSLCipher;
 
 mod rust;
 mod ivgenerators;
+mod keyderiv;
 //mod openssl;
 
 pub trait Cipher {
