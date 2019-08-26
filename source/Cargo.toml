@@ -40,6 +40,7 @@ uuid = { version = "0.5", features = ["v4"] }
 rust-argon2 = "0.5.1"
 #pkbdf2 = { version = "0.3.0", default-features = false }
 #scrypt = { version = "0.2", default-features = false }
-rand = { version = "0.5.5" }
+rdrand = "0.6.0"
+rand_core = "0.4.0"
 arrayvec = "0.4.11"
 termion = "1.5.3"

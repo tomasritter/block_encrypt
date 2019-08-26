@@ -35,8 +35,9 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>, KeyLength : 's
     // TODO: Probably change arguments to Vec with some asserts about the size of it? Will see after salting of key
     pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
         let mut gen_key : GenericArray<u8, KeyLength> = Default::default();
-        assert!(key.len() == gen_key.len());
-        gen_key[..key.len()].copy_from_slice(key);
+        let gen_key_len = gen_key.len();
+        //assert!(key.len() == gen_key.len());
+        gen_key[..gen_key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
             IVGeneratorEnum::Plain => Box::new(IVPlain::<IVLength>::create()) as Box<dyn IVGenerator<IVLength>>,

@@ -8,8 +8,9 @@ extern crate aes_soft as aes;
 extern crate typenum;
 //extern crate openssl;
 #[macro_use] extern crate generic_array;
-extern crate rand;
+extern crate rdrand;
 extern crate arrayvec;
+extern crate rand_core;
 
 mod ciphers;
 pub mod header;
@@ -21,16 +22,15 @@ use ciphers::Cipher;
 use self::ciphers::RustCipher;
 //use self::ciphers::OpenSSLCipher; //TODO: Figure out how to compile with openssl?
 use typenum::{U16, U24, U32};
-use rand::{thread_rng, Rng};
 //use openssl::symm::Cipher as OpenSSLCipherOption;
-use arrayvec::ArrayVec;
+use rdrand::RdRand;
+use rand_core::RngCore;
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write, Seek, SeekFrom};
 use syscall::error::{Error, Result, EIO};
 use std::vec::Vec;
 use std::boxed::Box;
-use rand::distributions::Standard;
 
 use redoxfs::{Disk, BLOCK_SIZE};
 use header::*;
@@ -59,41 +59,62 @@ impl BlockEncrypt {
                          iv_generator: IVGeneratorEnum, user_key_iterations: u64,
                          master_key_iterations: u64, password: &[u8]) -> Result<BlockEncrypt> {
         println!("Open BlockEncrypt {} ", path);
+        let mut generator = match RdRand::new() {
+            Ok(gen) => gen,
+            Err(err) => {
+                eprintln!("Unable to use the underlying random number generator");
+                return Err(Error::new(EIO))
+            }
+        };
 
         let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
+        let mut salt = [0u8; 32];
+        let mut master_key_salt = [0u8; 32];
 
-        let salt: ArrayVec<[u8; 32]> = thread_rng().sample_iter(&Standard).take(32).collect();
-        let master_key_salt: ArrayVec<[u8; 32]> = thread_rng().sample_iter(&Standard).take(32).collect();
+        generator.fill_bytes(&mut salt);
+        generator.fill_bytes(&mut master_key_salt);
 
+        println!("1");
         let length_of_key = BlockEncrypt::get_length_of_key(&encryption_alg);
         let user_key = BlockEncrypt::derive_digest(&deriv_function, &user_key_iterations, &password, &salt, &length_of_key);
+        println!("User key digest: {:?}", user_key);
 
-        let master_key: Vec<u8> = thread_rng().sample_iter(&Standard).take(length_of_key as usize).collect();
+        let mut master_key = [0u8; 32];
+        generator.fill_bytes(&mut master_key[..length_of_key as usize]);
+        println!("3");
 
         // Master key digest
-        let master_key_digest_vec = BlockEncrypt::derive_digest(&deriv_function, &master_key_iterations, &master_key, &master_key_salt, &length_of_key);
+        println!("Master key: {:?}", master_key);
+        let master_key_digest_vec = BlockEncrypt::derive_digest(&deriv_function, &master_key_iterations, &master_key[..length_of_key as usize], &master_key_salt, &32);
+        println!("4");
+
         let mut master_key_digest= [0u8; 32];
-        master_key_digest[..length_of_key as usize].copy_from_slice(&master_key_digest_vec);
+        master_key_digest[..32 as usize].copy_from_slice(&master_key_digest_vec);
+        println!("5");
 
         // Encrypt master key
         let cipher = BlockEncrypt::get_cipher(&encryption_alg, &cipher_mode, &iv_generator, &user_key);
         let master_key_encrypted_vec = cipher.encrypt(0, &master_key);
+        println!("6");
+
         let mut master_key_encrypted= [0u8; 32];
-        master_key_encrypted[..32 as usize].copy_from_slice(&master_key_encrypted_vec);
+        println!("Mkey vec size: {}", master_key_encrypted_vec.len());
+        master_key_encrypted[..32 as usize].copy_from_slice(&master_key_encrypted_vec[..32 as usize]);
+
+        println!("7");
 
         let header = EncryptHeader {
             deriv_function,
             encryption_alg,
             cipher_mode,
             iv_generator,
-            salt: salt.into_inner().unwrap(),
+            salt,
             user_key_iterations,
             master_key_iterations,
             master_key_encrypted,
             master_key_digest,
-            master_key_salt: master_key_salt.into_inner().unwrap()
+            master_key_salt
         };
-
         let serialized_header = EncryptHeader::serialize(&header);
         try_disk!(file.write(&serialized_header));
 
@@ -125,13 +146,17 @@ impl BlockEncrypt {
         // derive user key
         let user_key = BlockEncrypt::derive_digest(&header.deriv_function, &header.user_key_iterations, &password, &header.salt, &length_of_key);
 
+        println!("User key digest: {:?}", user_key);
         // decrypt master key
         let cipher = BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &user_key);
         let mut master_key = header.master_key_encrypted.clone();
-        cipher.decrypt(0, &mut master_key);
+        cipher.decrypt(0, &mut master_key[..32 as usize]);
+        println!("Master key: {:?}", master_key);
 
         // compare passwords
-        let master_key_digest = BlockEncrypt::derive_digest(&header.deriv_function, &header.master_key_iterations, &master_key, &header.master_key_salt, &length_of_key);
+        let master_key_digest = BlockEncrypt::derive_digest(&header.deriv_function, &header.master_key_iterations, &master_key[..length_of_key as usize], &header.master_key_salt, &32);
+        println!("Master key digest: {:?}", master_key_digest);
+        println!("Master key digest header: {:?}", header.master_key_digest);
         match master_key_digest == header.master_key_digest {
             true => Ok(
                 BlockEncrypt {
@@ -140,8 +165,10 @@ impl BlockEncrypt {
                     offset
                 }
             ),
-            _ => {  eprintln!("Entered candidate key is invalid.");
-                    Err(Error::new(EIO)) }
+            _ => {
+                eprintln!("Entered candidate key is invalid.");
+                Err(Error::new(EIO))
+            }
         }
 
 
@@ -169,26 +196,26 @@ impl BlockEncrypt {
             EncryptionAlgorithm::RustAes128 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>, U16, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>, U16, U16>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::RustAes192 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>, U24, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>, U24, U16>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
