@@ -14,6 +14,7 @@ extern crate rand_core;
 
 mod ciphers;
 pub mod header;
+pub mod utils;
 
 use block_modes::{BlockMode, Cbc, Ecb, Pcbc};
 use block_modes::block_padding::ZeroPadding;
