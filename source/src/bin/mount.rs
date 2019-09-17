@@ -255,7 +255,14 @@ fn main() {
         }
     };
 
-    let password = read_password();
+    let password = match args.next() {
+        Some(arg) => arg,
+        None => {
+            println!("block_encrypt: no password provided");
+            usage();
+            process::exit(1);
+        }
+    };
 
     let mut pipes = [0; 2];
     if pipe(&mut pipes) == 0 {
@@ -266,7 +273,7 @@ fn main() {
         if pid == 0 {
             drop(read);
 
-            daemon_encr(&disk_id, &mountpoint, write, &password)
+            daemon_encr(&disk_id, &mountpoint, write, password.as_bytes())
         } else if pid > 0 {
             drop(write);
 

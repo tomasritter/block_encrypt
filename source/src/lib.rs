@@ -197,39 +197,39 @@ impl BlockEncrypt {
             EncryptionAlgorithm::RustAes128 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>, U16, U16>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes128, Cbc<Aes128, ZeroPadding>>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>, U16, U16>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes128, Ecb<Aes128, ZeroPadding>>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>, U16, U16>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes128, Pcbc<Aes128, ZeroPadding>>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::RustAes192 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>, U24, U16>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes192, Cbc<Aes192, ZeroPadding>>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>, U24, U16>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes192, Ecb<Aes192, ZeroPadding>>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>, U24, U16>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes192, Pcbc<Aes192, ZeroPadding>>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::RustAes256 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>, U32, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes256, Cbc<Aes256, ZeroPadding>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(RustCipher::<Aes256, Ecb<Aes256, ZeroPadding>, U32, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes256, Ecb<Aes256, ZeroPadding>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(RustCipher::<Aes256, Pcbc<Aes256, ZeroPadding>, U32, U16>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(RustCipher::<Aes256, Pcbc<Aes256, ZeroPadding>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             }
