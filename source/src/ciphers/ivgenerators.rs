@@ -33,7 +33,7 @@ pub struct IVPlain<IVLength : ArrayLength<u8>> {
 impl <IVLength : ArrayLength<u8>> IVPlain<IVLength> {
     pub fn create() -> Self {
         IVPlain::<IVLength> {
-            ivlength : PhantomData
+            ivlength : Default::default()
         }
     }
 }
@@ -61,7 +61,7 @@ pub struct IVPlainBe<IVLength : ArrayLength<u8>> {
 impl <IVLength : ArrayLength<u8>> IVPlainBe<IVLength> {
     pub fn create() -> Self {
         IVPlainBe::<IVLength> {
-            ivlength : PhantomData
+            ivlength : Default::default()
         }
     }
 }
@@ -109,7 +109,7 @@ impl <Cipher: BlockCipher> IVEssiv<Cipher>
         IVEssiv::<Cipher> {
             hashed_key,
             plain_gen : IVPlain::<Cipher::BlockSize>::create(),
-            cipher_type: PhantomData
+            cipher_type: Default::default()
         }
 
     }
@@ -131,7 +131,7 @@ pub struct IVNull<IVLength : ArrayLength<u8>> {
 impl <IVLength : ArrayLength<u8>> IVNull<IVLength> {
     pub fn create() -> Self {
         IVNull::<IVLength> {
-            ivlength : PhantomData
+            ivlength : Default::default()
         }
     }
 }

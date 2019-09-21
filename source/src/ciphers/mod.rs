@@ -6,12 +6,10 @@ pub use self::ivgenerators::IVNull;
 pub use self::ivgenerators::IVEssiv;
 pub use self::keyderiv::Argon2;
 pub use self::keyderiv::KeyDerivationFunction;
-//pub use self::openssl::OpenSSLCipher;
 
 mod rust;
 mod ivgenerators;
 mod keyderiv;
-//mod openssl;
 
 pub trait Cipher {
     fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8>;

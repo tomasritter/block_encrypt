@@ -27,20 +27,14 @@ aes-soft = "0.3.3"
 block-cipher-trait="0.6.2"
 generic-array = "0.12.3"
 typenum = "1.10.0"
-#openssl-sys = { version = "0.9", features = ["vendored"] }
-#openssl = { version = "0.10", features = ["vendored"] }
 byteorder = { version = "1.3.2", features = ["i128"] }
 blake2 = "0.8.0"
 sha2 = "0.8.0"
 sha3 = "0.8.2"
 groestl = "0.8.0"
 digest = "0.8.1"
-uuid = { version = "0.5", features = ["v4"] }
-#serde = "1.0"
 rust-argon2 = "0.5.1"
-#pkbdf2 = { version = "0.3.0", default-features = false }
-#scrypt = { version = "0.2", default-features = false }
 rdrand = "0.6.0"
 rand_core = "0.4.0"
-arrayvec = "0.4.11"
 termion = "1.5.3"
+uuid = { version = "0.5", features = ["v4"] }

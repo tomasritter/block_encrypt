@@ -9,7 +9,6 @@ extern crate typenum;
 //extern crate openssl;
 #[macro_use] extern crate generic_array;
 extern crate rdrand;
-extern crate arrayvec;
 extern crate rand_core;
 
 mod ciphers;
