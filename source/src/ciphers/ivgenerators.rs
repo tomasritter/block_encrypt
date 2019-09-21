@@ -19,7 +19,7 @@ use self::sha2::{Sha256, Sha512};
 use self::sha3::{Sha3_256, Sha3_512};
 use self::groestl::{Groestl256};
 use self::block_cipher_trait::BlockCipher;
-use typenum::U1;
+use typenum::{U1, Unsigned};
 use header::IVGeneratorEnum;
 
 pub trait IVGenerator<IVLength : ArrayLength<u8>> {
@@ -82,24 +82,18 @@ impl <IVLength : ArrayLength<u8>> IVGenerator<IVLength> for IVPlainBe<IVLength> 
     }
 }
 
-pub struct IVEssiv<Cipher, KeyLength: ArrayLength<u8>, IVLength : ArrayLength<u8>>
-    where
-        Cipher: BlockCipher<KeySize = KeyLength, BlockSize = IVLength>,
-        <Cipher as BlockCipher>::ParBlocks: ArrayLength<GenericArray<u8, IVLength>>
+pub struct IVEssiv<Cipher: BlockCipher>
 {
-    hashed_key: GenericArray<u8, KeyLength>,
-    plain_gen: IVPlain<IVLength>,
+    hashed_key: GenericArray<u8, Cipher::KeySize>,
+    plain_gen: IVPlain<Cipher::BlockSize>,
     cipher_type: PhantomData<Cipher>
 }
 
-impl <Cipher, KeyLength: ArrayLength<u8>, IVLength : ArrayLength<u8>> IVEssiv<Cipher, KeyLength, IVLength>
-    where
-        Cipher: BlockCipher<KeySize = KeyLength, BlockSize = IVLength>,
-        <Cipher as BlockCipher>::ParBlocks: ArrayLength<GenericArray<u8, IVLength>>
+impl <Cipher: BlockCipher> IVEssiv<Cipher>
 {
-    pub fn create(key : &GenericArray<u8, KeyLength>, essiv_generator : &IVGeneratorEnum) -> Self {
-        let mut hashed_key : GenericArray<u8, KeyLength> = Default::default();
-        let length = KeyLength::to_usize();
+    pub fn create(key : &GenericArray<u8, Cipher::KeySize>, essiv_generator : &IVGeneratorEnum) -> Self {
+        let mut hashed_key : GenericArray<u8, Cipher::KeySize> = Default::default();
+        let length = Cipher::KeySize::to_usize();
         match essiv_generator {
             IVGeneratorEnum::EssivSha2_256 => { hashed_key[..length].copy_from_slice(&Sha256::digest(key)); },
             IVGeneratorEnum::EssivSha2_512 => { hashed_key[..length].copy_from_slice(&Sha512::digest(key)); },
@@ -112,21 +106,17 @@ impl <Cipher, KeyLength: ArrayLength<u8>, IVLength : ArrayLength<u8>> IVEssiv<Ci
             _ => assert!(false)
         };
 
-        IVEssiv::<Cipher, KeyLength, IVLength> {
+        IVEssiv::<Cipher> {
             hashed_key,
-            plain_gen : IVPlain::<IVLength>::create(),
+            plain_gen : IVPlain::<Cipher::BlockSize>::create(),
             cipher_type: PhantomData
         }
 
     }
 }
 
-impl <Cipher, KeyLength: ArrayLength<u8>, IVLength : ArrayLength<u8>> IVGenerator<IVLength> for IVEssiv<Cipher, KeyLength, IVLength>
-    where
-        Cipher: BlockCipher<KeySize = KeyLength, BlockSize = IVLength>,
-        <Cipher as BlockCipher>::ParBlocks: ArrayLength<GenericArray<u8, IVLength>>
-{
-    fn getiv(&self, block : u64) -> GenericArray<u8, IVLength> {
+impl <Cipher: BlockCipher> IVGenerator<Cipher::BlockSize> for IVEssiv<Cipher> {
+    fn getiv(&self, block : u64) -> GenericArray<u8, Cipher::BlockSize> {
         let mut iv = self.plain_gen.getiv(block);
         let cipher = Cipher::new(&self.hashed_key);
         cipher.encrypt_block(&mut iv);

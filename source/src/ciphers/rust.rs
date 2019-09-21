@@ -16,8 +16,8 @@ use header::IVGeneratorEnum;
 
 pub struct RustCipher<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
-    key : GenericArray<u8, <BC as BlockCipher>::KeySize>,
-    iv_generator : Box<dyn IVGenerator<<BC as BlockCipher>::BlockSize>>, // TODO: Try to get static dispatch working
+    key : GenericArray<u8, BC::KeySize>,
+    iv_generator : Box<dyn IVGenerator<BC::BlockSize>>, // TODO: Try to get static dispatch working
     cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
 }
@@ -25,27 +25,27 @@ pub struct RustCipher<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> RustCipher<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
-        let mut gen_key : GenericArray<u8, <BC as BlockCipher>::KeySize> = Default::default();
+        let mut gen_key : GenericArray<u8, BC::KeySize> = Default::default();
         let gen_key_len = gen_key.len();
         //assert!(key.len() == gen_key.len());
         gen_key[..gen_key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
-            IVGeneratorEnum::Plain => Box::new(IVPlain::<<BC as BlockCipher>::BlockSize>::create()) as Box<dyn IVGenerator<<BC as BlockCipher>::BlockSize>>,
-            IVGeneratorEnum::PlainBE => Box::new(IVPlainBe::<<BC as BlockCipher>::BlockSize>::create()) as Box<dyn IVGenerator<<BC as BlockCipher>::BlockSize>>,
-            IVGeneratorEnum::Null => Box::new(IVNull::<<BC as BlockCipher>::BlockSize>::create()) as Box<dyn IVGenerator<<BC as BlockCipher>::BlockSize>>,
-            _ => Box::new(IVEssiv::<BC, <BC as BlockCipher>::KeySize, <BC as BlockCipher>::BlockSize>::create(&gen_key, iv_generator_type))
+            IVGeneratorEnum::Plain => Box::new(IVPlain::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,
+            IVGeneratorEnum::PlainBE => Box::new(IVPlainBe::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,
+            IVGeneratorEnum::Null => Box::new(IVNull::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,
+            _ => Box::new(IVEssiv::<BC>::create(&gen_key, iv_generator_type))
         };
 
         RustCipher::<BC, C> {
             key: gen_key,
             iv_generator,
-            cipher_type : PhantomData,
-            cipher_impl : PhantomData
+            cipher_type : Default::default(),
+            cipher_impl : Default::default()
         }
     }
 
-    fn get_iv(&self, block : u64) -> GenericArray<u8, <BC as BlockCipher>::BlockSize> {
+    fn get_iv(&self, block : u64) -> GenericArray<u8, BC::BlockSize> {
         self.iv_generator.getiv(block)
     }
 }
