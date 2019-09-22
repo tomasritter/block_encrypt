@@ -20,9 +20,7 @@ use block_modes::block_padding::ZeroPadding;
 use aes::{Aes128, Aes192, Aes256};
 use ciphers::Cipher;
 use self::ciphers::RustCipher;
-//use self::ciphers::OpenSSLCipher; //TODO: Figure out how to compile with openssl?
 use typenum::{U16, U24, U32, Unsigned};
-//use openssl::symm::Cipher as OpenSSLCipherOption;
 use rdrand::RdRand;
 use rand_core::RngCore;
 
