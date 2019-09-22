@@ -7,17 +7,18 @@ extern crate libc;
 extern crate syscall;
 
 extern crate redoxfs;
-extern crate uuid;
 extern crate block_encrypt;
+extern crate uuid;
+
 
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write, stdout, stdin};
 use std::os::unix::io::{FromRawFd, RawFd};
 use std::process;
+use uuid::Uuid;
 
 use redoxfs::{Disk, DiskCache, DiskFile, mount};
-use uuid::Uuid;
 use block_encrypt::BlockEncrypt;
 use block_encrypt::utils::read_password;
 
@@ -28,9 +29,6 @@ extern "C" fn unmount_handler(_s: usize) {
 }
 
 #[cfg(target_os = "redox")]
-//set up a signal handler on redox, this implements unmounting. I have no idea what sa_flags is
-//for, so I put 2. I don't think 0,0 is a valid sa_mask. I don't know what i'm doing here. When u
-//send it a sigkill, it shuts off the filesystem
 fn setsig() {
     use syscall::{sigaction, SigAction, SIGTERM};
 
@@ -44,7 +42,6 @@ fn setsig() {
 }
 
 #[cfg(not(target_os = "redox"))]
-// on linux, this is implemented properly, so no need for this unscrupulous nonsense!
 fn setsig() {
     ()
 }
@@ -70,12 +67,7 @@ fn pipe(pipes: &mut [usize; 2]) -> isize {
 }
 
 fn usage() {
-    println!("redoxfs [--uuid] [disk or uuid] [mountpoint]");
-}
-
-enum DiskId {
-    Path(String),
-    Uuid(Uuid),
+    println!("block-encrypt disk mountpoint password");
 }
 
 #[cfg(not(target_os = "redox"))]
@@ -92,14 +84,14 @@ fn disk_paths(paths: &mut Vec<String>) {
                 if let Ok(path) = entry.path().into_os_string().into_string() {
                     let scheme = path.trim_start_matches(':').trim_matches('/');
                     if scheme.starts_with("disk") {
-                        println!("redoxfs: found scheme {}", scheme);
+                        println!("block_encrypt: found scheme {}", scheme);
                         schemes.push(format!("{}:", scheme));
                     }
                 }
             }
         },
         Err(err) => {
-            println!("redoxfs: failed to list schemes: {}", err);
+            println!("block_encrypt: failed to list schemes: {}", err);
         }
     }
 
@@ -108,139 +100,50 @@ fn disk_paths(paths: &mut Vec<String>) {
             Ok(entries) => for entry_res in entries {
                 if let Ok(entry) = entry_res {
                     if let Ok(path) = entry.path().into_os_string().into_string() {
-                        println!("redoxfs: found path {}", path);
+                        println!("block_encrypt: found path {}", path);
                         paths.push(path);
                     }
                 }
             },
             Err(err) => {
-                println!("redoxfs: failed to list '{}': {}", scheme, err);
+                println!("block_encrypt: failed to list '{}': {}", scheme, err);
             }
         }
     }
 }
 
-fn daemon_encr(disk_id: &DiskId, mountpoint: &str, mut write: File, password: &[u8]) -> ! {
+fn daemon_encr(path: &str, mountpoint: &str, mut write: File, password: &[u8]) -> ! {
     setsig();
 
-    let mut paths = vec![];
-    let mut uuid_opt = None;
-
-    match *disk_id {
-        DiskId::Path(ref path) => {
-            paths.push(path.clone());
-        },
-        DiskId::Uuid(ref uuid) => {
-            disk_paths(&mut paths);
-            uuid_opt = Some(uuid.clone());
-        },
-    }
-
-    for path in paths {
-        println!("redoxfs: opening {}", path);
+        println!("block_encrypt: opening {}", path);
         match BlockEncrypt::open_used_disk(&path, password).map(|image| DiskCache::new(image)) {
             Ok(disk) => match redoxfs::FileSystem::open(disk) {
                 Ok(filesystem) => {
-                    println!("redoxfs: opened filesystem on {} with uuid {}", path,
+                    println!("block_encrypt: opened filesystem on {} with uuid {}", path,
                              Uuid::from_bytes(&filesystem.header.1.uuid).unwrap().hyphenated());
 
-                    let matches = if let Some(uuid) = uuid_opt {
-                        if &filesystem.header.1.uuid == uuid.as_bytes() {
-                            println!("redoxfs: filesystem on {} matches uuid {}", path, uuid.hyphenated());
-                            true
-                        } else {
-                            println!("redoxfs: filesystem on {} does not match uuid {}", path, uuid.hyphenated());
-                            false
-                        }
-                    } else {
-                        true
-                    };
 
-                    if matches {
-                        match mount(filesystem, &mountpoint, || {
-                            println!("redoxfs: mounted filesystem on {} to {}", path, mountpoint);
-                            let _ = write.write(&[0]);
-                        }) {
-                            Ok(()) => {
-                                println!("PROCESS EXIT");
-                                process::exit(0);
-                            },
-                            Err(err) => {
-                                println!("redoxfs: failed to mount {} to {}: {}", path, mountpoint, err);
-                            }
-                        }
-                    }
+                    mount(filesystem, &mountpoint, || {
+                        println!("block_encrypt: mounted filesystem on {} to {}", path, mountpoint);
+                        let _ = write.write(&[0]); });
                 },
-                Err(err) => println!("redoxfs: failed to open filesystem {}: {}", path, err)
+                Err(err) => println!("block_encrypt: failed to open filesystem {}: {}", path, err)
             },
-            Err(err) => println!("redoxfs: failed to open image {}: {}", path, err)
+            Err(err) => println!("block_encrypt: failed to open image {}: {}", path, err)
         }
-    }
 
-    match *disk_id {
-        DiskId::Path(ref path) => {
-            println!("redoxfs: not able to mount path {}", path);
-        },
-        DiskId::Uuid(ref uuid) => {
-            println!("redoxfs: not able to mount uuid {}", uuid.hyphenated());
-        },
-    }
-
+    println!("block_encrypt: not able to mount path {}", path);
     let _ = write.write(&[1]);
     process::exit(1);
-}
-
-fn print_uuid(path: &str) {
-    match DiskFile::open(&path).map(|image| DiskCache::new(image)) {
-        Ok(disk) => match redoxfs::FileSystem::open(disk) {
-            Ok(filesystem) => {
-                println!("{}", Uuid::from_bytes(&filesystem.header.1.uuid).unwrap().hyphenated());
-            },
-            Err(err) => println!("redoxfs: failed to open filesystem {}: {}", path, err)
-        },
-        Err(err) => println!("redoxfs: failed to open image {}: {}", path, err)
-    }
 }
 
 fn main() {
     let mut args = env::args().skip(1);
 
-    let disk_id = match args.next() {
-        Some(arg) => if arg == "--uuid" {
-            let uuid = match args.next() {
-                Some(arg) => match Uuid::parse_str(&arg) {
-                    Ok(uuid) => uuid,
-                    Err(err) => {
-                        println!("redoxfs: invalid uuid '{}': {}", arg, err);
-                        usage();
-                        process::exit(1);
-                    }
-                },
-                None => {
-                    println!("redoxfs: no uuid provided");
-                    usage();
-                    process::exit(1);
-                }
-            };
-
-            DiskId::Uuid(uuid)
-        } else if arg == "--get-uuid" {
-            match args.next() {
-                Some(arg) => {
-                    print_uuid(&arg);
-                    process::exit(1);
-                },
-                None => {
-                    println!("redoxfs: no disk provided");
-                    usage();
-                    process::exit(1);
-                },
-            };
-        } else {
-            DiskId::Path(arg)
-        },
+    let disk_path = match args.next() {
+        Some(arg) => arg,
         None => {
-            println!("redoxfs: no disk provided");
+            println!("block_encrypt: no disk provided");
             usage();
             process::exit(1);
         }
@@ -249,7 +152,7 @@ fn main() {
     let mountpoint = match args.next() {
         Some(arg) => arg,
         None => {
-            println!("redoxfs: no mountpoint provided");
+            println!("block_encrypt: no mountpoint provided");
             usage();
             process::exit(1);
         }
@@ -273,7 +176,7 @@ fn main() {
         if pid == 0 {
             drop(read);
 
-            daemon_encr(&disk_id, &mountpoint, write, password.as_bytes())
+            daemon_encr(&disk_path, &mountpoint, write, password.as_bytes())
         } else if pid > 0 {
             drop(write);
 
@@ -282,9 +185,9 @@ fn main() {
 
             process::exit(res[0] as i32);
         } else {
-            panic!("redoxfs: failed to fork");
+            panic!("block_encrypt: failed to fork");
         }
     } else {
-        panic!("redoxfs: failed to create pipe");
+        panic!("block_encrypt: failed to create pipe");
     }
 }
