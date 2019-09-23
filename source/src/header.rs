@@ -1,14 +1,7 @@
-pub enum DerivationFunction {
-    Argon2i,
-    Argon2id
-    //PBKDF2,
-    //Scrypt
-}
-
 pub enum EncryptionAlgorithm {
-    RustAes128,
-    RustAes192,
-    RustAes256
+    Aes128,
+    Aes192,
+    Aes256
 }
 
 pub enum CipherMode {
@@ -32,13 +25,10 @@ pub enum IVGeneratorEnum {
 
 #[repr(C, align(4096))] // Align to the size of the block
 pub struct EncryptHeader {
-    pub deriv_function: DerivationFunction,
     pub encryption_alg: EncryptionAlgorithm,
     pub cipher_mode: CipherMode,
     pub iv_generator: IVGeneratorEnum,
     pub salt: [u8; 32],
-    pub user_key_iterations: u64,
-    pub master_key_iterations: u64,
     pub master_key_encrypted: [u8; 32],
     pub master_key_digest: [u8; 32],
     pub master_key_salt: [u8; 32]

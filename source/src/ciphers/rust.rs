@@ -14,7 +14,7 @@ use self::generic_array::{GenericArray, ArrayLength};
 use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull};
 use header::IVGeneratorEnum;
 
-pub struct RustCipher<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
+pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
     key : GenericArray<u8, BC::KeySize>,
     iv_generator : Box<dyn IVGenerator<BC::BlockSize>>, // TODO: Try to get static dispatch working
@@ -22,7 +22,7 @@ pub struct RustCipher<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
     cipher_impl : PhantomData<C>
 }
 
-impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> RustCipher<BC, C>
+impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
         let mut gen_key : GenericArray<u8, BC::KeySize> = Default::default();
@@ -37,7 +37,7 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> RustCipher<BC,
             _ => Box::new(IVEssiv::<BC>::create(&gen_key, iv_generator_type))
         };
 
-        RustCipher::<BC, C> {
+        CipherImpl::<BC, C> {
             key: gen_key,
             iv_generator,
             cipher_type : Default::default(),
@@ -50,7 +50,7 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> RustCipher<BC,
     }
 }
 
-impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for RustCipher<BC, C>
+impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for CipherImpl<BC, C>
 {
     fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8> {
         let c = C::new_var(&self.key, &self.get_iv(block)).unwrap();

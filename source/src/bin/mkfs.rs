@@ -13,22 +13,11 @@ use uuid::Uuid;
 use block_encrypt::BlockEncrypt;
 use block_encrypt::header::*;
 
-fn parse_deriv_function(s: &str) -> DerivationFunction {
-    match s {
-        "argon2i" => DerivationFunction::Argon2i,
-        "argon2id" => DerivationFunction::Argon2id,
-        _ => {
-            println!("redoxfs-mkfs-enc: failed to read derivation function type");
-            process::exit(1);
-        }
-    }
-}
-
 fn parse_encryption_algorithm(s: &str) -> EncryptionAlgorithm {
     match s {
-        "rust-aes128" => EncryptionAlgorithm::RustAes128,
-        "rust-aes192" => EncryptionAlgorithm::RustAes192,
-        "rust-aes256" => EncryptionAlgorithm::RustAes256,
+        "aes128" => EncryptionAlgorithm::Aes128,
+        "aes192" => EncryptionAlgorithm::Aes192,
+        "aes256" => EncryptionAlgorithm::Aes256,
         _ => {
             println!("redoxfs-mkfs-enc: failed to read encryption algorithm type");
             process::exit(1);
@@ -91,17 +80,6 @@ fn parse_ivgenerator(s: &str) -> IVGeneratorEnum {
     }
 }
 
-fn parse_iterations(s: &str) -> u64 {
-    let n = s.parse::<u64>();
-    match n {
-        Ok(arg) => arg,
-        Err(err) => {
-            println!("redoxfs-mkfs-enc: wasn't able to parse the number of iterations");
-            process::exit(1);
-        }
-    }
-}
-
 fn main() {
     let mut args = env::args().skip(1);
 
@@ -111,14 +89,6 @@ fn main() {
         println!("redoxfs-mkfs-enc: no disk image provided");
         println!("redoxfs-mkfs-enc DISK DERIVATION_FUNCTION ENC_ALGORITHM CIPHER_MODE IVGENERATOR USER_KEY_ITER MASTER_KEY_ITER [BOOTLOADER]");
         process::exit(1);
-    };
-
-    let deriv_function = match args.next() {
-        Some(arg) => parse_deriv_function(&arg),
-        None => {
-            println!("redoxfs-mkfs-enc: derivation function type not provided");
-            process::exit(1);
-        }
     };
 
     let encryption_alg = match args.next() {
@@ -143,16 +113,6 @@ fn main() {
             println!("redoxfs-mkfs-enc: initialization vector generator not provided");
             process::exit(1);
         }
-    };
-
-    let user_key_iterations = match args.next() {
-        Some(arg) => parse_iterations(&arg),
-        None => 10000 // Default magic values
-    };
-
-    let master_key_iterations = match args.next() {
-        Some(arg) => parse_iterations(&arg),
-        None => 10000
     };
 
     // Read password
@@ -196,9 +156,8 @@ fn main() {
 
     let p = pass1.as_bytes();
 
-    let disk = match BlockEncrypt::open_new_disk(&disk_path, deriv_function, encryption_alg,
-                                                 cipher_mode, iv_generator, user_key_iterations,
-                                                    master_key_iterations, p) {
+    let disk = match BlockEncrypt::open_new_disk(&disk_path, encryption_alg,
+                                                 cipher_mode, iv_generator, p) {
         Ok(disk) => disk,
         Err(err) => {
             println!("redoxfs-mkfs-enc: failed to open image {}: {}", disk_path, err);
