@@ -60,7 +60,7 @@ impl BlockEncrypt {
                          iv_generator: IVGeneratorEnum,
                          password: &[u8])
         -> Result<BlockEncrypt> {
-        println!("Open BlockEncrypt {} ", path);
+        println!("Creating encrypted filesystem {} ", path);
         let mut generator = match RdRand::new() {
             Ok(gen) => gen,
             Err(err) => {
@@ -76,34 +76,25 @@ impl BlockEncrypt {
         generator.fill_bytes(&mut salt);
         generator.fill_bytes(&mut master_key_salt);
 
-        println!("1");
         let length_of_key = BlockEncrypt::get_length_of_key(&encryption_alg);
         let user_key = BlockEncrypt::derive_digest(&password, &salt, &length_of_key);
-        println!("User key digest: {:?}", user_key);
 
         let mut master_key = [0u8; 32];
         generator.fill_bytes(&mut master_key[..length_of_key as usize]);
-        println!("3");
 
         // Master key digest
-        println!("Master key: {:?}", master_key);
         let master_key_digest_vec = BlockEncrypt::derive_digest(&master_key[..length_of_key as usize], &master_key_salt, &32);
-        println!("4");
 
         let mut master_key_digest= [0u8; 32];
         master_key_digest[..32 as usize].copy_from_slice(&master_key_digest_vec);
-        println!("5");
 
         // Encrypt master key
         let cipher = BlockEncrypt::get_cipher(&encryption_alg, &cipher_mode, &iv_generator, &user_key);
         let master_key_encrypted_vec = cipher.encrypt(0, &master_key);
-        println!("6");
 
         let mut master_key_encrypted= [0u8; 32];
-        println!("Mkey vec size: {}", master_key_encrypted_vec.len());
         master_key_encrypted[..32 as usize].copy_from_slice(&master_key_encrypted_vec[..32 as usize]);
 
-        println!("7");
 
         let header = EncryptHeader {
             encryption_alg,
@@ -130,7 +121,7 @@ impl BlockEncrypt {
     }
 
     pub fn open_used_disk(path: &str, password: &[u8]) -> Result<BlockEncrypt> {
-        println!("Open BlockEncrypt {} ", path);
+        println!("Mounting encrypted device {} ", path);
         let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
 
         // Read header from disk
@@ -145,7 +136,6 @@ impl BlockEncrypt {
         // derive user key
         let user_key = BlockEncrypt::derive_digest(&password, &header.salt, &length_of_key);
 
-        println!("User key digest: {:?}", user_key);
         // decrypt master key
         let cipher = BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &user_key);
         let mut master_key = header.master_key_encrypted.clone();
@@ -155,7 +145,6 @@ impl BlockEncrypt {
         // compare passwords
         let master_key_digest = BlockEncrypt::derive_digest(&master_key[..length_of_key as usize], &header.master_key_salt, &32);
         println!("Master key digest: {:?}", master_key_digest);
-        println!("Master key digest header: {:?}", header.master_key_digest);
         match master_key_digest == header.master_key_digest {
             true => Ok(
                 BlockEncrypt {
@@ -240,15 +229,8 @@ impl Disk for BlockEncrypt {
         println!("BlockEncrypt file read at {}", block);
         try_disk!(self.file.seek(SeekFrom::Start((block + self.offset) * BLOCK_SIZE)));
 
-
         let count = try_disk!(self.file.read(buffer));
         self.cipher.decrypt(block, buffer);
-
-        println!("Read_at-count: {}", count);
-        //println!("Read-at-buffer len: {}", buffer.len());
-        //println!("Read-at-vec len: {}", new_buf.len());
-
-        //buffer[..vec.len()].copy_from_slice(&vec);
 
         Ok(count)
     }
@@ -258,10 +240,7 @@ impl Disk for BlockEncrypt {
         try_disk!(self.file.seek(SeekFrom::Start((block + self.offset) * BLOCK_SIZE)));
 
         let vec = self.cipher.encrypt(block, buffer);
-        //println!("Wrote encoded: {:?}", vec);
         let count = try_disk!(self.file.write(&vec));
-        println!("Read encoded vec size: {}", vec.len());
-        println!("Read encoded buffer size: {}", count);
 
         Ok(count)
     }
