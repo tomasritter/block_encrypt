@@ -49,7 +49,7 @@ macro_rules! try_disk {
 
 pub struct BlockEncrypt {
     file: File,
-    cipher : Box<dyn Cipher>,
+    cipher : Box<dyn Cipher>, // TODO: static dispatch
     offset: u64
 }
 
@@ -70,14 +70,14 @@ impl BlockEncrypt {
         };
 
         let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
-        let mut salt = [0u8; 32];
+        let mut user_key_salt = [0u8; 32];
         let mut master_key_salt = [0u8; 32];
 
-        generator.fill_bytes(&mut salt);
+        generator.fill_bytes(&mut user_key_salt);
         generator.fill_bytes(&mut master_key_salt);
 
         let length_of_key = BlockEncrypt::get_length_of_key(&encryption_alg);
-        let user_key = BlockEncrypt::derive_digest(&password, &salt, &length_of_key);
+        let user_key = BlockEncrypt::derive_digest(&password, &user_key_salt, &length_of_key);
 
         let mut master_key = [0u8; 32];
         generator.fill_bytes(&mut master_key[..length_of_key as usize]);
@@ -100,7 +100,7 @@ impl BlockEncrypt {
             encryption_alg,
             cipher_mode,
             iv_generator,
-            salt,
+            user_key_salt,
             master_key_encrypted,
             master_key_digest,
             master_key_salt
@@ -134,7 +134,7 @@ impl BlockEncrypt {
 
         // Verify password
         // derive user key
-        let user_key = BlockEncrypt::derive_digest(&password, &header.salt, &length_of_key);
+        let user_key = BlockEncrypt::derive_digest(&password, &header.user_key_salt, &length_of_key);
 
         // decrypt master key
         let cipher = BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &user_key);
@@ -184,39 +184,39 @@ impl BlockEncrypt {
             EncryptionAlgorithm::Aes128 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes128, Cbc<Aes128, ZeroPadding>>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes128, Cbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes128, Ecb<Aes128, ZeroPadding>>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes128, Ecb<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes128, Pcbc<Aes128, ZeroPadding>>::create(&user_key[..16], iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes128, Pcbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::Aes192 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes192, Cbc<Aes192, ZeroPadding>>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes192, Cbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes192, Ecb<Aes192, ZeroPadding>>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes192, Ecb<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes192, Pcbc<Aes192, ZeroPadding>>::create(&user_key[..24], iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes192, Pcbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::Aes256 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes256, Cbc<Aes256, ZeroPadding>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes256, Cbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes256, Ecb<Aes256, ZeroPadding>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes256, Ecb<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes256, Pcbc<Aes256, ZeroPadding>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes256, Pcbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             }

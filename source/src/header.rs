@@ -28,7 +28,7 @@ pub struct EncryptHeader {
     pub encryption_alg: EncryptionAlgorithm,
     pub cipher_mode: CipherMode,
     pub iv_generator: IVGeneratorEnum,
-    pub salt: [u8; 32],
+    pub user_key_salt: [u8; 32],
     pub master_key_encrypted: [u8; 32],
     pub master_key_digest: [u8; 32],
     pub master_key_salt: [u8; 32]
