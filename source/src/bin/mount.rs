@@ -13,14 +13,13 @@ extern crate uuid;
 
 use std::env;
 use std::fs::File;
-use std::io::{Read, Write, stdout, stdin};
+use std::io::{Read, Write};
 use std::os::unix::io::{FromRawFd, RawFd};
 use std::process;
 use uuid::Uuid;
 
-use redoxfs::{Disk, DiskCache, DiskFile, mount};
+use redoxfs::{DiskCache, mount};
 use block_encrypt::BlockEncrypt;
-use block_encrypt::utils::read_password;
 
 #[cfg(target_os = "redox")]
 extern "C" fn unmount_handler(_s: usize) {
@@ -70,48 +69,6 @@ fn usage() {
     println!("block-encrypt disk mountpoint password");
 }
 
-#[cfg(not(target_os = "redox"))]
-fn disk_paths(_paths: &mut Vec<String>) {}
-
-#[cfg(target_os = "redox")]
-fn disk_paths(paths: &mut Vec<String>) {
-    use std::fs;
-
-    let mut schemes = vec![];
-    match fs::read_dir(":") {
-        Ok(entries) => for entry_res in entries {
-            if let Ok(entry) = entry_res {
-                if let Ok(path) = entry.path().into_os_string().into_string() {
-                    let scheme = path.trim_start_matches(':').trim_matches('/');
-                    if scheme.starts_with("disk") {
-                        println!("block_encrypt: found scheme {}", scheme);
-                        schemes.push(format!("{}:", scheme));
-                    }
-                }
-            }
-        },
-        Err(err) => {
-            println!("block_encrypt: failed to list schemes: {}", err);
-        }
-    }
-
-    for scheme in schemes {
-        match fs::read_dir(&scheme) {
-            Ok(entries) => for entry_res in entries {
-                if let Ok(entry) = entry_res {
-                    if let Ok(path) = entry.path().into_os_string().into_string() {
-                        println!("block_encrypt: found path {}", path);
-                        paths.push(path);
-                    }
-                }
-            },
-            Err(err) => {
-                println!("block_encrypt: failed to list '{}': {}", scheme, err);
-            }
-        }
-    }
-}
-
 fn daemon_encr(path: &str, mountpoint: &str, mut write: File, password: &[u8]) -> ! {
     setsig();
 
@@ -123,9 +80,18 @@ fn daemon_encr(path: &str, mountpoint: &str, mut write: File, password: &[u8]) -
                              Uuid::from_bytes(&filesystem.header.1.uuid).unwrap().hyphenated());
 
 
-                    mount(filesystem, &mountpoint, || {
+                    match mount(filesystem, &mountpoint, || {
                         println!("block_encrypt: mounted filesystem on {} to {}", path, mountpoint);
-                        let _ = write.write(&[0]); });
+                        let _ = write.write(&[0]); })
+                        {
+                        Ok(()) => {
+                            println!("PROCESS EXIT");
+                            process::exit(0);
+                        },
+                        Err(err) => {
+                            println!("block_encrypt: failed to mount {} to {}: {}", path, mountpoint, err);
+                        }
+                    }
                 },
                 Err(err) => println!("block_encrypt: failed to open filesystem {}: {}", path, err)
             },

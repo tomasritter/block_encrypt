@@ -6,19 +6,23 @@ extern crate redoxfs;
 extern crate block_modes;
 extern crate aes_soft as aes;
 extern crate typenum;
-//extern crate openssl;
-#[macro_use] extern crate generic_array;
+extern crate generic_array;
 extern crate rdrand;
 extern crate rand_core;
 extern crate argon2;
 extern crate enum_dispatch;
+extern crate block_cipher_trait;
+extern crate byteorder;
+extern crate digest;
+extern crate blake2;
+extern crate sha2;
+extern crate sha3;
+extern crate groestl;
 
 mod ciphers;
 pub mod header;
-pub mod utils;
 
 use ciphers::{*};
-use typenum::{U16, U24, U32, Unsigned};
 use rdrand::RdRand;
 use rand_core::RngCore;
 
@@ -26,7 +30,6 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write, Seek, SeekFrom};
 use syscall::error::{Error, Result, EIO};
 use std::vec::Vec;
-use std::boxed::Box;
 
 use self::argon2::Config as ArgonConfig;
 use self::argon2::Variant as ArgonVariant;
@@ -60,7 +63,7 @@ impl BlockEncrypt {
         println!("Creating encrypted filesystem {} ", path);
         let mut generator = match RdRand::new() {
             Ok(gen) => gen,
-            Err(err) => {
+            Err(_) => {
                 eprintln!("Unable to use the underlying random number generator");
                 return Err(Error::new(EIO))
             }
@@ -120,7 +123,7 @@ impl BlockEncrypt {
         let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
         // Read header from disk
         let mut buffer = [0u8; BLOCK_SIZE as usize];
-        let count = try_disk!(file.read(&mut buffer));
+        try_disk!(file.read(&mut buffer));
         let header = EncryptHeader::deserialize(&buffer);
         let offset = 1;
         let key_length = BlockEncrypt::get_length_of_key(&header.encryption_alg, &header.cipher_mode);

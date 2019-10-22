@@ -1,26 +1,13 @@
-extern crate typenum;
-extern crate byteorder;
-extern crate generic_array;
-extern crate digest;
-extern crate blake2;
-extern crate sha2;
-extern crate sha3;
-extern crate groestl;
-extern crate block_cipher_trait;
-extern crate aes_soft as aes;
-
-
-use self::byteorder::{ByteOrder, LittleEndian, BigEndian};
-use self::generic_array::{GenericArray, ArrayLength};
+use byteorder::{ByteOrder, LittleEndian, BigEndian};
+use generic_array::{GenericArray};
 use std::marker::PhantomData;
-use self::digest::Digest;
-use self::blake2::{Blake2b, Blake2s};
-use self::sha2::{Sha256, Sha512};
-use self::sha3::{Sha3_256, Sha3_512};
-use self::groestl::{Groestl256};
-use self::block_cipher_trait::BlockCipher;
-use aes::{Aes128, Aes192, Aes256};
-use typenum::{U1, Unsigned};
+use digest::Digest;
+use blake2::{Blake2b, Blake2s};
+use sha2::{Sha256, Sha512};
+use sha3::{Sha3_256, Sha3_512};
+use groestl::{Groestl256};
+use block_cipher_trait::BlockCipher;
+use typenum::{Unsigned};
 use header::IVGeneratorEnum;
 use enum_dispatch::enum_dispatch;
 

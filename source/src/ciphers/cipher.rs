@@ -1,15 +1,10 @@
-extern crate block_modes;
-extern crate aes_soft as aes;
-extern crate block_cipher_trait;
-extern crate generic_array;
-
 use ciphers::Cipher;
 use block_modes::BlockMode;
 use block_modes::block_padding::ZeroPadding;
 use std::vec::Vec;
-use self::block_cipher_trait::{BlockCipher};
+use block_cipher_trait::{BlockCipher};
 use std::marker::PhantomData;
-use self::generic_array::{GenericArray, ArrayLength};
+use generic_array::{GenericArray};
 use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull, IVGeneratorEnumType};
 use header::IVGeneratorEnum;
 
@@ -55,6 +50,6 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for Cip
 
     fn decrypt(&self, block : u64, buffer : &mut [u8]) {
         let c = C::new_var(&self.key, &self.get_iv(block)).unwrap();
-        c.decrypt(buffer);
+        c.decrypt(buffer).unwrap();
     }
 }

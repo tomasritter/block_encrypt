@@ -5,7 +5,6 @@ extern crate termion;
 
 use std::{env, fs, process, time};
 use std::io::{Read, Write, stdout, stdin};
-use std::vec::Vec;
 
 use termion::input::TermRead;
 use redoxfs::FileSystem;

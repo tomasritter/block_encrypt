@@ -1,5 +1,5 @@
-use self::rust::CipherImpl;
-use block_modes::{BlockMode, Cbc, Ecb, Pcbc, Xts};
+use self::cipher::CipherImpl;
+use block_modes::{Cbc, Ecb, Pcbc, Xts};
 use block_modes::block_padding::ZeroPadding;
 use aes::{Aes128, Aes192, Aes256};
 use enum_dispatch::enum_dispatch;
@@ -19,7 +19,7 @@ pub type Aes256Ecb = CipherImpl<Aes256, Ecb<Aes256, ZeroPadding>>;
 pub type Aes256Pcbc = CipherImpl<Aes256, Pcbc<Aes256, ZeroPadding>>;
 pub type Aes256Xts = CipherImpl<Aes256, Xts<Aes256, ZeroPadding>>;
 
-mod rust;
+mod cipher;
 mod ivgenerators;
 
 #[enum_dispatch(CipherEnum)]
