@@ -1,4 +1,0 @@
-name = "block_encrypt"
-version = "0.1.0"
-target = "x86_64-unknown-redox"
-depends = []
