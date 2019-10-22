@@ -49,7 +49,7 @@ macro_rules! try_disk {
 
 pub struct BlockEncrypt {
     file: File,
-    cipher : CipherEnum, // TODO: static dispatch
+    cipher : CipherEnum,
     offset: u64
 }
 
