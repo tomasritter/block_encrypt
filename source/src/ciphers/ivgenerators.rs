@@ -91,7 +91,7 @@ pub struct IVEssiv<Cipher: BlockCipher>
 
 impl <Cipher: BlockCipher> IVEssiv<Cipher>
 {
-    pub fn create(key : &GenericArray<u8, Cipher::KeySize>, essiv_generator : &IVGeneratorEnum) -> Self {
+    pub fn create(key : &[u8], essiv_generator : &IVGeneratorEnum) -> Self {
         let mut hashed_key : GenericArray<u8, Cipher::KeySize> = Default::default();
         let length = Cipher::KeySize::to_usize();
         match essiv_generator {

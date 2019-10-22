@@ -16,7 +16,7 @@ use header::IVGeneratorEnum;
 
 pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
-    key : GenericArray<u8, BC::KeySize>,
+    key : Vec<u8>,
     iv_generator : Box<dyn IVGenerator<BC::BlockSize>>, // TODO: Try to get static dispatch working
     cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
@@ -25,10 +25,9 @@ pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
-        let mut gen_key : GenericArray<u8, BC::KeySize> = Default::default();
-        let gen_key_len = gen_key.len();
+        let gen_key = key.to_vec();
         //assert!(key.len() == gen_key.len());
-        gen_key[..gen_key_len].copy_from_slice(key);
+        //gen_key[..key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
             IVGeneratorEnum::Plain => Box::new(IVPlain::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,

@@ -30,6 +30,7 @@ fn parse_cipher_mode(s: &str) -> CipherMode {
         "cbc" => CipherMode::CBC,
         "ecb" => CipherMode::ECB,
         "pcbc" => CipherMode::PCBC,
+        "xts" => CipherMode::XTS,
         _ => {
             println!("redoxfs-mkfs-enc: failed to read cipher mode type");
             process::exit(1);

@@ -8,6 +8,7 @@ pub enum CipherMode {
     CBC,
     ECB,
     PCBC,
+    XTS,
 }
 
 pub enum IVGeneratorEnum {
@@ -29,8 +30,8 @@ pub struct EncryptHeader {
     pub cipher_mode: CipherMode,
     pub iv_generator: IVGeneratorEnum,
     pub user_key_salt: [u8; 32],
-    pub master_key_encrypted: [u8; 32],
-    pub master_key_digest: [u8; 32],
+    pub master_key_encrypted: [u8; 64],
+    pub master_key_digest: [u8; 64],
     pub master_key_salt: [u8; 32]
 }
 

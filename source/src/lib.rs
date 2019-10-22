@@ -16,7 +16,7 @@ mod ciphers;
 pub mod header;
 pub mod utils;
 
-use block_modes::{BlockMode, Cbc, Ecb, Pcbc};
+use block_modes::{BlockMode, Cbc, Ecb, Pcbc, Xts};
 use block_modes::block_padding::ZeroPadding;
 use aes::{Aes128, Aes192, Aes256};
 use ciphers::Cipher;
@@ -76,25 +76,24 @@ impl BlockEncrypt {
         generator.fill_bytes(&mut user_key_salt);
         generator.fill_bytes(&mut master_key_salt);
 
-        let length_of_key = BlockEncrypt::get_length_of_key(&encryption_alg);
-        let user_key = BlockEncrypt::derive_digest(&password, &user_key_salt, &length_of_key);
+        let key_length = BlockEncrypt::get_length_of_key(&encryption_alg, &cipher_mode);
+        let user_key = BlockEncrypt::derive_digest(&password, &user_key_salt, &key_length);
 
-        let mut master_key = [0u8; 32];
-        generator.fill_bytes(&mut master_key[..length_of_key as usize]);
+        let mut master_key = [0u8; 64];
+        generator.fill_bytes(&mut master_key[..key_length]);
 
         // Master key digest
-        let master_key_digest_vec = BlockEncrypt::derive_digest(&master_key[..length_of_key as usize], &master_key_salt, &32);
+        let master_key_digest_vec = BlockEncrypt::derive_digest(&master_key[..key_length], &master_key_salt, &key_length);
 
-        let mut master_key_digest= [0u8; 32];
-        master_key_digest[..32 as usize].copy_from_slice(&master_key_digest_vec);
+        let mut master_key_digest= [0u8; 64];
+        master_key_digest[..key_length].copy_from_slice(&master_key_digest_vec);
 
         // Encrypt master key
         let cipher = BlockEncrypt::get_cipher(&encryption_alg, &cipher_mode, &iv_generator, &user_key);
-        let master_key_encrypted_vec = cipher.encrypt(0, &master_key);
+        let master_key_encrypted_vec = cipher.encrypt(0, &master_key[..key_length]);
 
-        let mut master_key_encrypted= [0u8; 32];
-        master_key_encrypted[..32 as usize].copy_from_slice(&master_key_encrypted_vec[..32 as usize]);
-
+        let mut master_key_encrypted= [0u8; 64];
+        master_key_encrypted[..key_length].copy_from_slice(&master_key_encrypted_vec[..key_length]);
 
         let header = EncryptHeader {
             encryption_alg,
@@ -114,42 +113,38 @@ impl BlockEncrypt {
         Ok(
             BlockEncrypt {
                 file,
-                cipher: BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &master_key),
+                cipher: BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &master_key[..key_length]),
                 offset
             }
         )
     }
 
     pub fn open_used_disk(path: &str, password: &[u8]) -> Result<BlockEncrypt> {
-        println!("Mounting encrypted device {} ", path);
         let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
-
         // Read header from disk
         let mut buffer = [0u8; BLOCK_SIZE as usize];
         let count = try_disk!(file.read(&mut buffer));
         let header = EncryptHeader::deserialize(&buffer);
         let offset = 1;
-        let length_of_key = BlockEncrypt::get_length_of_key(&header.encryption_alg);
+        let key_length = BlockEncrypt::get_length_of_key(&header.encryption_alg, &header.cipher_mode);
 
 
         // Verify password
         // derive user key
-        let user_key = BlockEncrypt::derive_digest(&password, &header.user_key_salt, &length_of_key);
+        let user_key = BlockEncrypt::derive_digest(&password, &header.user_key_salt, &key_length);
 
         // decrypt master key
         let cipher = BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &user_key);
         let mut master_key = header.master_key_encrypted.clone();
-        cipher.decrypt(0, &mut master_key[..32 as usize]);
-        println!("Master key: {:?}", master_key);
+        cipher.decrypt(0, &mut master_key[..key_length]);
 
         // compare passwords
-        let master_key_digest = BlockEncrypt::derive_digest(&master_key[..length_of_key as usize], &header.master_key_salt, &32);
-        println!("Master key digest: {:?}", master_key_digest);
-        match master_key_digest == header.master_key_digest {
+        let master_key_digest = BlockEncrypt::derive_digest(&master_key[..key_length], &header.master_key_salt, &key_length);
+        match master_key_digest == header.master_key_digest[..key_length].to_vec() {
             true => Ok(
                 BlockEncrypt {
                     file,
-                    cipher: BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &master_key),
+                    cipher: BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &master_key[..key_length]),
                     offset
                 }
             ),
@@ -162,15 +157,20 @@ impl BlockEncrypt {
 
     }
 
-    fn get_length_of_key(encryption_alg: &EncryptionAlgorithm) -> u64 {
-        match encryption_alg {
+    fn get_length_of_key(encryption_alg: &EncryptionAlgorithm, cipher_mode: &CipherMode) -> usize {
+        let length = match encryption_alg {
             EncryptionAlgorithm::Aes128 => 16,
             EncryptionAlgorithm::Aes192 => 24,
             EncryptionAlgorithm::Aes256 => 32
+        };
+
+        match cipher_mode {
+            CipherMode::XTS => 2 * length,
+            _ =>  length
         }
     }
 
-    fn derive_digest(password: &[u8], salt: &[u8], hash_length: &u64) -> Vec<u8> {
+    fn derive_digest(password: &[u8], salt: &[u8], hash_length: &usize) -> Vec<u8> {
         let mut config = ArgonConfig::default();
         config.variant = ArgonVariant::Argon2i;
         config.hash_length = *hash_length as u32;
@@ -179,44 +179,54 @@ impl BlockEncrypt {
     }
 
     fn get_cipher(encryption_alg: &EncryptionAlgorithm, cipher_mode: &CipherMode,
-                  iv_generator: &IVGeneratorEnum, user_key: &[u8]) -> Box<dyn Cipher> {
+                  iv_generator: &IVGeneratorEnum, master_key: &[u8]) -> Box<dyn Cipher> {
+
         match encryption_alg {
             EncryptionAlgorithm::Aes128 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes128, Cbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes128, Cbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes128, Ecb<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes128, Ecb<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes128, Pcbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes128, Pcbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
+                    }
+                    CipherMode::XTS => {
+                        Box::new(CipherImpl::<Aes128, Xts<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::Aes192 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes192, Cbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes192, Cbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes192, Ecb<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes192, Ecb<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes192, Pcbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes192, Pcbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
+                    }
+                    CipherMode::XTS => {
+                        Box::new(CipherImpl::<Aes192, Xts<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             },
             EncryptionAlgorithm::Aes256 => {
                 match cipher_mode {
                     CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes256, Cbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes256, Cbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes256, Ecb<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes256, Ecb<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     },
                     CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes256, Pcbc<_, _>>::create(user_key, iv_generator)) as Box<dyn Cipher>
+                        Box::new(CipherImpl::<Aes256, Pcbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
+                    }
+                    CipherMode::XTS => {
+                        Box::new(CipherImpl::<Aes256, Xts<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
                     }
                 }
             }
