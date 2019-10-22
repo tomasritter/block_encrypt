@@ -11,16 +11,13 @@ extern crate typenum;
 extern crate rdrand;
 extern crate rand_core;
 extern crate argon2;
+extern crate enum_dispatch;
 
 mod ciphers;
 pub mod header;
 pub mod utils;
 
-use block_modes::{BlockMode, Cbc, Ecb, Pcbc, Xts};
-use block_modes::block_padding::ZeroPadding;
-use aes::{Aes128, Aes192, Aes256};
-use ciphers::Cipher;
-use self::ciphers::CipherImpl;
+use ciphers::{*};
 use typenum::{U16, U24, U32, Unsigned};
 use rdrand::RdRand;
 use rand_core::RngCore;
@@ -49,7 +46,7 @@ macro_rules! try_disk {
 
 pub struct BlockEncrypt {
     file: File,
-    cipher : Box<dyn Cipher>, // TODO: static dispatch
+    cipher : CipherEnum, // TODO: static dispatch
     offset: u64
 }
 
@@ -179,55 +176,31 @@ impl BlockEncrypt {
     }
 
     fn get_cipher(encryption_alg: &EncryptionAlgorithm, cipher_mode: &CipherMode,
-                  iv_generator: &IVGeneratorEnum, master_key: &[u8]) -> Box<dyn Cipher> {
+                  iv_generator: &IVGeneratorEnum, master_key: &[u8]) -> CipherEnum {
 
         match encryption_alg {
             EncryptionAlgorithm::Aes128 => {
                 match cipher_mode {
-                    CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes128, Cbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    },
-                    CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes128, Ecb<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    },
-                    CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes128, Pcbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    }
-                    CipherMode::XTS => {
-                        Box::new(CipherImpl::<Aes128, Xts<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    }
+                    CipherMode::CBC => Aes128Cbc::create(master_key, iv_generator).into(),
+                    CipherMode::ECB => Aes128Ecb::create(master_key, iv_generator).into(),
+                    CipherMode::PCBC => Aes128Pcbc::create(master_key, iv_generator).into(),
+                    CipherMode::XTS => Aes128Xts::create(master_key, iv_generator).into()
                 }
             },
             EncryptionAlgorithm::Aes192 => {
                 match cipher_mode {
-                    CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes192, Cbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    },
-                    CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes192, Ecb<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    },
-                    CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes192, Pcbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    }
-                    CipherMode::XTS => {
-                        Box::new(CipherImpl::<Aes192, Xts<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    }
+                    CipherMode::CBC => Aes192Cbc::create(master_key, iv_generator).into(),
+                    CipherMode::ECB => Aes192Ecb::create(master_key, iv_generator).into(),
+                    CipherMode::PCBC => Aes192Pcbc::create(master_key, iv_generator).into(),
+                    CipherMode::XTS => Aes192Xts::create(master_key, iv_generator).into(),
                 }
             },
             EncryptionAlgorithm::Aes256 => {
                 match cipher_mode {
-                    CipherMode::CBC => {
-                        Box::new(CipherImpl::<Aes256, Cbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    },
-                    CipherMode::ECB => {
-                        Box::new(CipherImpl::<Aes256, Ecb<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    },
-                    CipherMode::PCBC => {
-                        Box::new(CipherImpl::<Aes256, Pcbc<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    }
-                    CipherMode::XTS => {
-                        Box::new(CipherImpl::<Aes256, Xts<_, _>>::create(master_key, iv_generator)) as Box<dyn Cipher>
-                    }
+                    CipherMode::CBC => Aes256Cbc::create(master_key, iv_generator).into(),
+                    CipherMode::ECB => Aes256Ecb::create(master_key, iv_generator).into(),
+                    CipherMode::PCBC => Aes256Pcbc::create(master_key, iv_generator).into(),
+                    CipherMode::XTS => Aes256Xts::create(master_key, iv_generator).into()
                 }
             }
         }

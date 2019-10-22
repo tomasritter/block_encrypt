@@ -4,20 +4,19 @@ extern crate block_cipher_trait;
 extern crate generic_array;
 
 use ciphers::Cipher;
-
 use block_modes::BlockMode;
 use block_modes::block_padding::ZeroPadding;
 use std::vec::Vec;
 use self::block_cipher_trait::{BlockCipher};
 use std::marker::PhantomData;
 use self::generic_array::{GenericArray, ArrayLength};
-use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull};
+use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull, IVGeneratorEnumType};
 use header::IVGeneratorEnum;
 
 pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
     key : Vec<u8>,
-    iv_generator : Box<dyn IVGenerator<BC::BlockSize>>, // TODO: Try to get static dispatch working
+    iv_generator : IVGeneratorEnumType<BC>,
     cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
 }
@@ -26,14 +25,12 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC,
 {
     pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
         let gen_key = key.to_vec();
-        //assert!(key.len() == gen_key.len());
-        //gen_key[..key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
-            IVGeneratorEnum::Plain => Box::new(IVPlain::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,
-            IVGeneratorEnum::PlainBE => Box::new(IVPlainBe::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,
-            IVGeneratorEnum::Null => Box::new(IVNull::<BC::BlockSize>::create()) as Box<dyn IVGenerator<BC::BlockSize>>,
-            _ => Box::new(IVEssiv::<BC>::create(&gen_key, iv_generator_type))
+            IVGeneratorEnum::Plain => IVPlain::<BC>::create().into(),
+            IVGeneratorEnum::PlainBE => IVPlainBe::<BC>::create().into(),
+            IVGeneratorEnum::Null => IVNull::<BC>::create().into(),
+            _ => IVEssiv::<BC>::create(&gen_key, iv_generator_type).into()
         };
 
         CipherImpl::<BC, C> {
