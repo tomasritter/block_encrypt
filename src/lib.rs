@@ -187,7 +187,7 @@ impl BlockEncrypt {
                     CipherMode::CBC => Aes128Cbc::create(master_key, iv_generator).into(),
                     CipherMode::ECB => Aes128Ecb::create(master_key, iv_generator).into(),
                     CipherMode::PCBC => Aes128Pcbc::create(master_key, iv_generator).into(),
-                    CipherMode::XTS => Aes128Xts::create(master_key, iv_generator).into()
+                    CipherMode::XTS => Aes128Xts::create(master_key).into()
                 }
             },
             EncryptionAlgorithm::Aes192 => {
@@ -195,7 +195,7 @@ impl BlockEncrypt {
                     CipherMode::CBC => Aes192Cbc::create(master_key, iv_generator).into(),
                     CipherMode::ECB => Aes192Ecb::create(master_key, iv_generator).into(),
                     CipherMode::PCBC => Aes192Pcbc::create(master_key, iv_generator).into(),
-                    CipherMode::XTS => Aes192Xts::create(master_key, iv_generator).into(),
+                    CipherMode::XTS => Aes192Xts::create(master_key).into(),
                 }
             },
             EncryptionAlgorithm::Aes256 => {
@@ -203,7 +203,7 @@ impl BlockEncrypt {
                     CipherMode::CBC => Aes256Cbc::create(master_key, iv_generator).into(),
                     CipherMode::ECB => Aes256Ecb::create(master_key, iv_generator).into(),
                     CipherMode::PCBC => Aes256Pcbc::create(master_key, iv_generator).into(),
-                    CipherMode::XTS => Aes256Xts::create(master_key, iv_generator).into()
+                    CipherMode::XTS => Aes256Xts::create(master_key).into()
                 }
             }
         }

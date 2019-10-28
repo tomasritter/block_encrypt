@@ -1,16 +1,18 @@
 use ciphers::Cipher;
-use block_modes::BlockMode;
+use block_modes::{BlockMode, Xts};
 use block_modes::block_padding::ZeroPadding;
 use std::vec::Vec;
 use block_cipher_trait::{BlockCipher};
 use std::marker::PhantomData;
-use generic_array::{GenericArray};
+use generic_array::{GenericArray, ArrayLength};
 use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull, IVGeneratorEnumType};
 use header::IVGeneratorEnum;
+use typenum::{U2, Sum};
+use std::ops::Mul;
 
 pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
-    key : Vec<u8>,
+    key : GenericArray<u8, BC::KeySize>,
     iv_generator : IVGeneratorEnumType<BC>,
     cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
@@ -19,17 +21,19 @@ pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
-        let gen_key = key.to_vec();
+        let mut key_copy : GenericArray<u8, BC::KeySize> = Default::default();
+        let key_len = key_copy.len();
+        key_copy[..key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
             IVGeneratorEnum::Plain => IVPlain::<BC>::create().into(),
             IVGeneratorEnum::PlainBE => IVPlainBe::<BC>::create().into(),
             IVGeneratorEnum::Null => IVNull::<BC>::create().into(),
-            _ => IVEssiv::<BC>::create(&gen_key, iv_generator_type).into()
+            _ => IVEssiv::<BC>::create(&key_copy, iv_generator_type).into()
         };
 
         CipherImpl::<BC, C> {
-            key: gen_key,
+            key: key_copy,
             iv_generator,
             cipher_type : Default::default(),
             cipher_impl : Default::default()
@@ -50,6 +54,50 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for Cip
 
     fn decrypt(&self, block : u64, buffer : &mut [u8]) {
         let c = C::new_var(&self.key, &self.get_iv(block)).unwrap();
+        c.decrypt(buffer).unwrap();
+    }
+}
+
+
+// Specialization for XTS cipher mode, since it requires double the size of the key
+// and the initialization vector is always plain
+pub struct XTSCipherImpl<BC: BlockCipher>
+where BC::KeySize: std::ops::Add,
+    <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
+{
+    key: GenericArray<u8, Sum<BC::KeySize, BC::KeySize>>,
+    iv_generator: IVPlain<BC>,
+    cipher_type: PhantomData<BC>
+}
+
+impl <BC: 'static + BlockCipher> XTSCipherImpl<BC>
+where BC::KeySize: std::ops::Add,
+      <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
+{
+    pub fn create(key: &[u8]) -> Self {
+        let mut key_copy : GenericArray<u8, Sum<BC::KeySize, BC::KeySize>> = Default::default();
+        let key_len = key_copy.len();
+        key_copy[..key_len].copy_from_slice(key);
+
+        XTSCipherImpl::<BC> {
+            key: key_copy,
+            iv_generator : IVPlain::<BC>::create(),
+            cipher_type: Default::default()
+        }
+    }
+}
+
+impl <BC : 'static + BlockCipher> Cipher for XTSCipherImpl<BC>
+where BC::KeySize: std::ops::Add,
+      <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
+{
+    fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8> {
+        let c = Xts::<BC, ZeroPadding>::new_var(&self.key, &self.iv_generator.getiv(block)).unwrap();
+        c.encrypt_vec(buffer)
+    }
+
+    fn decrypt(&self, block : u64, buffer : &mut [u8]) {
+        let c = Xts::<BC, ZeroPadding>::new_var(&self.key, &self.iv_generator.getiv(block)).unwrap();
         c.decrypt(buffer).unwrap();
     }
 }
