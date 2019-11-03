@@ -18,6 +18,7 @@ extern crate blake2;
 extern crate sha2;
 extern crate sha3;
 extern crate groestl;
+extern crate aesni;
 
 mod ciphers;
 pub mod header;
@@ -183,27 +184,54 @@ impl BlockEncrypt {
 
         match encryption_alg {
             EncryptionAlgorithm::Aes128 => {
-                match cipher_mode {
-                    CipherMode::CBC => Aes128Cbc::create(master_key, iv_generator).into(),
-                    CipherMode::ECB => Aes128Ecb::create(master_key, iv_generator).into(),
-                    CipherMode::PCBC => Aes128Pcbc::create(master_key, iv_generator).into(),
-                    CipherMode::XTS => Aes128Xts::create(master_key).into()
+                if is_x86_feature_detected!("aes") {
+                    match cipher_mode {
+                        CipherMode::CBC => Aesni128Cbc::create(master_key, iv_generator).into(),
+                        CipherMode::ECB => Aesni128Ecb::create(master_key, iv_generator).into(),
+                        CipherMode::PCBC => Aesni128Pcbc::create(master_key, iv_generator).into(),
+                        CipherMode::XTS => Aesni128Xts::create(master_key).into()
+                    }
+                } else {
+                    match cipher_mode {
+                        CipherMode::CBC => Aes128Cbc::create(master_key, iv_generator).into(),
+                        CipherMode::ECB => Aes128Ecb::create(master_key, iv_generator).into(),
+                        CipherMode::PCBC => Aes128Pcbc::create(master_key, iv_generator).into(),
+                        CipherMode::XTS => Aes128Xts::create(master_key).into()
+                    }
                 }
             },
             EncryptionAlgorithm::Aes192 => {
-                match cipher_mode {
-                    CipherMode::CBC => Aes192Cbc::create(master_key, iv_generator).into(),
-                    CipherMode::ECB => Aes192Ecb::create(master_key, iv_generator).into(),
-                    CipherMode::PCBC => Aes192Pcbc::create(master_key, iv_generator).into(),
-                    CipherMode::XTS => Aes192Xts::create(master_key).into(),
+                if is_x86_feature_detected!("aes") {
+                    match cipher_mode {
+                        CipherMode::CBC => Aesni192Cbc::create(master_key, iv_generator).into(),
+                        CipherMode::ECB => Aesni192Ecb::create(master_key, iv_generator).into(),
+                        CipherMode::PCBC => Aesni192Pcbc::create(master_key, iv_generator).into(),
+                        CipherMode::XTS => Aesni192Xts::create(master_key).into(),
+                    }
+                } else {
+                    match cipher_mode {
+                        CipherMode::CBC => Aes192Cbc::create(master_key, iv_generator).into(),
+                        CipherMode::ECB => Aes192Ecb::create(master_key, iv_generator).into(),
+                        CipherMode::PCBC => Aes192Pcbc::create(master_key, iv_generator).into(),
+                        CipherMode::XTS => Aes192Xts::create(master_key).into(),
+                    }
                 }
             },
             EncryptionAlgorithm::Aes256 => {
-                match cipher_mode {
-                    CipherMode::CBC => Aes256Cbc::create(master_key, iv_generator).into(),
-                    CipherMode::ECB => Aes256Ecb::create(master_key, iv_generator).into(),
-                    CipherMode::PCBC => Aes256Pcbc::create(master_key, iv_generator).into(),
-                    CipherMode::XTS => Aes256Xts::create(master_key).into()
+                if is_x86_feature_detected!("aes") {
+                    match cipher_mode {
+                        CipherMode::CBC => Aesni256Cbc::create(master_key, iv_generator).into(),
+                        CipherMode::ECB => Aesni256Ecb::create(master_key, iv_generator).into(),
+                        CipherMode::PCBC => Aesni256Pcbc::create(master_key, iv_generator).into(),
+                        CipherMode::XTS => Aesni256Xts::create(master_key).into()
+                    }
+                } else {
+                    match cipher_mode {
+                        CipherMode::CBC => Aes256Cbc::create(master_key, iv_generator).into(),
+                        CipherMode::ECB => Aes256Ecb::create(master_key, iv_generator).into(),
+                        CipherMode::PCBC => Aes256Pcbc::create(master_key, iv_generator).into(),
+                        CipherMode::XTS => Aes256Xts::create(master_key).into()
+                    }
                 }
             }
         }
