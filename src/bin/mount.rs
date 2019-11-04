@@ -1,5 +1,5 @@
 #![cfg_attr(not(target_os = "redox"), feature(libc))]
-
+#![feature(rustc_private)]
 #[cfg(not(target_os = "redox"))]
 extern crate libc;
 
@@ -80,7 +80,7 @@ fn daemon_encr(path: &str, mountpoint: &str, mut write: File, password: &[u8]) -
                              Uuid::from_bytes(&filesystem.header.1.uuid).unwrap().hyphenated());
 
 
-                    match mount(filesystem, &mountpoint, || {
+                    match mount(filesystem, &mountpoint, |_| {
                         println!("block_encrypt: mounted filesystem on {} to {}", path, mountpoint);
                         let _ = write.write(&[0]); })
                         {
