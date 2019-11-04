@@ -74,7 +74,7 @@ fn daemon_encr(path: &str, mountpoint: &str, mut write: File, password: &[u8]) -
 
         println!("block_encrypt: opening {}", path);
         match BlockEncrypt::open_used_disk(&path, password).map(|image| DiskCache::new(image)) {
-            Ok(disk) => match redoxfs::FileSystem::open(disk) {
+            Ok(disk) => match redoxfs::FileSystem::open(disk, None) {
                 Ok(filesystem) => {
                     println!("block_encrypt: opened filesystem on {} with uuid {}", path,
                              Uuid::from_bytes(&filesystem.header.1.uuid).unwrap().hyphenated());

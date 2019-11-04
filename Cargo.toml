@@ -13,6 +13,11 @@ name = "block_encrypt-mkfs"
 path = "src/bin/mkfs.rs"
 doc = false
 
+[[bin]]
+name = "list-schemes"
+path = "src/bin/list-schemes.rs"
+doc = false
+
 [lib]
 name = "block_encrypt"
 path = "src/lib.rs"
@@ -20,7 +25,7 @@ path = "src/lib.rs"
 
 [dependencies]
 redox_syscall = "0.1"
-redoxfs = "0.3.7"
+redoxfs = { path = '../../redoxfs/source' } 
 hex-literal = "0.2.0"
 block-modes = { git = 'https://github.com/tomasritter/block-ciphers/'}
 aes-soft = "0.3.3"
