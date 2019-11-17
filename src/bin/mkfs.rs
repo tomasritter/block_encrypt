@@ -37,8 +37,7 @@ fn parse_cipher_mode(s: &str) -> CipherMode {
     }
 }
 
-// TODO: Error messages
-fn parse_ivgenerator(s: &str) -> IVGeneratorEnum {
+fn parse_ivgenerator(s: &str) -> IVType {
     if s.starts_with("essiv") {
         let mut split = s.splitn(2, ':');
         if split.next().unwrap() != "essiv" {
@@ -48,13 +47,13 @@ fn parse_ivgenerator(s: &str) -> IVGeneratorEnum {
             match split.next() {
                 Some(arg) => {
                     match arg {
-                        "sha2-256" => IVGeneratorEnum::EssivSha2_256,
-                        "sha2-512" => IVGeneratorEnum::EssivSha2_512,
-                        "sha3-256" => IVGeneratorEnum::EssivSha3_256,
-                        "sha3-512" => IVGeneratorEnum::EssivSha3_512,
-                        "blake2b" => IVGeneratorEnum::EssivBlake2b,
-                        "blake2s" => IVGeneratorEnum::EssivBlake2s,
-                        "groestl" => IVGeneratorEnum::EssivGroestl,
+                        "sha2-256" => IVType::EssivSha2_256,
+                        "sha2-512" => IVType::EssivSha2_512,
+                        "sha3-256" => IVType::EssivSha3_256,
+                        "sha3-512" => IVType::EssivSha3_512,
+                        "blake2b" => IVType::EssivBlake2b,
+                        "blake2s" => IVType::EssivBlake2s,
+                        "groestl" => IVType::EssivGroestl,
                         _ => {
                             println!("redoxfs-mkfs-enc: failed to read iv generator type");
                             process::exit(1);
@@ -69,9 +68,9 @@ fn parse_ivgenerator(s: &str) -> IVGeneratorEnum {
         }
     } else {
         match s {
-            "plain" => IVGeneratorEnum::Plain,
-            "plainbe" => IVGeneratorEnum::PlainBE,
-            "null" => IVGeneratorEnum::Null,
+            "plain" => IVType::Plain,
+            "plainbe" => IVType::PlainBE,
+            "null" => IVType::Null,
             _ => {
                 println!("redoxfs-mkfs-enc: failed to read iv generator type");
                 process::exit(1);
@@ -87,7 +86,7 @@ fn main() {
         path
     } else {
         println!("redoxfs-mkfs-enc: no disk image provided");
-        println!("redoxfs-mkfs-enc DISK DERIVATION_FUNCTION ENC_ALGORITHM CIPHER_MODE IVGENERATOR USER_KEY_ITER MASTER_KEY_ITER [BOOTLOADER]");
+        println!("redoxfs-mkfs-enc DISK ENC_ALGORITHM CIPHER_MODE IVGENERATOR");
         process::exit(1);
     };
 
@@ -165,27 +164,8 @@ fn main() {
         }
     };
 
-    let bootloader_path_opt = args.next();
-
-    let mut bootloader = vec![];
-    if let Some(bootloader_path) = bootloader_path_opt {
-        match fs::File::open(&bootloader_path) {
-            Ok(mut file) => match file.read_to_end(&mut bootloader) {
-                Ok(_) => (),
-                Err(err) => {
-                    println!("redoxfs-mkfs-enc: failed to read bootloader {}: {}", bootloader_path, err);
-                    process::exit(1);
-                }
-            },
-            Err(err) => {
-                println!("redoxfs-mkfs-enc: failed to open bootloader {}: {}", bootloader_path, err);
-                process::exit(1);
-            }
-        }
-    };
-
     let ctime = time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap();
-    match FileSystem::create_reserved(disk, &bootloader, ctime.as_secs(), ctime.subsec_nanos()) {
+    match FileSystem::create_reserved(disk, &[],ctime.as_secs(), ctime.subsec_nanos()) {
         Ok(filesystem) => {
             let uuid = Uuid::from_bytes(&filesystem.header.1.uuid).unwrap();
             println!("redoxfs-mkfs-enc: created filesystem on {}, reserved {} blocks, size {} MB, uuid {}", disk_path, filesystem.block, filesystem.header.1.size/1000/1000, uuid.hyphenated());

@@ -35,42 +35,35 @@ use std::vec::Vec;
 use self::argon2::Config as ArgonConfig;
 use self::argon2::Variant as ArgonVariant;
 
-use redoxfs::{Disk, BLOCK_SIZE};
+use redoxfs::{DiskFile, Disk, BLOCK_SIZE};
 use header::*;
 
-macro_rules! try_disk {
-    ($expr:expr) => (match $expr {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("Disk I/O Error: {}", err);
-            return Err(Error::new(EIO));
-        }
-    })
-}
-
 pub struct BlockEncrypt {
-    file: File,
+    file: DiskFile,
     cipher : CipherEnum,
     offset: u64
 }
 
 impl BlockEncrypt {
+    /**
+    * Creates a new
+    **/
     pub fn open_new_disk(path: &str,
                          encryption_alg: EncryptionAlgorithm,
                          cipher_mode: CipherMode,
-                         iv_generator: IVGeneratorEnum,
+                         iv_generator: IVType,
                          password: &[u8])
-        -> Result<BlockEncrypt> {
+                         -> Result<BlockEncrypt> {
         println!("Creating encrypted filesystem {} ", path);
         let mut generator = match RdRand::new() {
             Ok(gen) => gen,
             Err(_) => {
-                eprintln!("Unable to use the underlying random number generator");
+                eprintln!("Rdrand not supported on your machine.");
                 return Err(Error::new(EIO))
             }
         };
 
-        let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
+        let mut file = DiskFile::open(path)?;
         let mut user_key_salt = [0u8; 32];
         let mut master_key_salt = [0u8; 32];
 
@@ -106,7 +99,13 @@ impl BlockEncrypt {
             master_key_salt
         };
         let serialized_header = EncryptHeader::serialize(&header);
-        try_disk!(file.write(&serialized_header));
+        match file.write_at(0, &serialized_header) {
+            Ok(_) => println!("Wrote encryption header to disk"),
+            Err(e) => {
+                eprintln!("Coulnd't write encryption header to disk");
+                return Err(Error::new(EIO))
+            }
+        }
 
         let offset = 1; // Size of struct in BLOCK_SIZE size
 
@@ -121,10 +120,10 @@ impl BlockEncrypt {
     }
 
     pub fn open_used_disk(path: &str, password: &[u8]) -> Result<BlockEncrypt> {
-        let mut file = try_disk!(OpenOptions::new().read(true).write(true).open(path));
+        let mut file = DiskFile::open(path)?;
         // Read header from disk
         let mut buffer = [0u8; BLOCK_SIZE as usize];
-        try_disk!(file.read(&mut buffer));
+        file.read_at(0, &mut buffer)?;
         let header = EncryptHeader::deserialize(&buffer);
         let offset = 1;
         let key_length = BlockEncrypt::get_length_of_key(&header.encryption_alg, &header.cipher_mode);
@@ -141,18 +140,17 @@ impl BlockEncrypt {
 
         // compare passwords
         let master_key_digest = BlockEncrypt::derive_digest(&master_key[..key_length], &header.master_key_salt, &key_length);
-        match master_key_digest == header.master_key_digest[..key_length].to_vec() {
-            true => Ok(
+        if master_key_digest == header.master_key_digest[..key_length].to_vec() {
+            Ok(
                 BlockEncrypt {
                     file,
                     cipher: BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &master_key[..key_length]),
                     offset
                 }
-            ),
-            _ => {
-                eprintln!("Entered candidate key is invalid.");
-                Err(Error::new(EIO))
-            }
+            )
+        } else {
+            eprintln!("Entered candidate key is invalid.");
+            Err(Error::new(EIO))
         }
 
 
@@ -180,7 +178,7 @@ impl BlockEncrypt {
     }
 
     fn get_cipher(encryption_alg: &EncryptionAlgorithm, cipher_mode: &CipherMode,
-                  iv_generator: &IVGeneratorEnum, master_key: &[u8]) -> CipherEnum {
+                  iv_generator: &IVType, master_key: &[u8]) -> CipherEnum {
 
         match encryption_alg {
             EncryptionAlgorithm::Aes128 => {
@@ -241,26 +239,19 @@ impl BlockEncrypt {
 impl Disk for BlockEncrypt {
     fn read_at(&mut self, block: u64, buffer: &mut [u8]) -> Result<usize> {
         println!("BlockEncrypt file read at {}", block);
-        try_disk!(self.file.seek(SeekFrom::Start((block + self.offset) * BLOCK_SIZE)));
-
-        let count = try_disk!(self.file.read(buffer));
+        let count = self.file.read_at(block + self.offset, buffer)?;
         self.cipher.decrypt(block, buffer);
-
         Ok(count)
     }
 
     fn write_at(&mut self, block: u64, buffer: &[u8]) -> Result<usize> {
         println!("BlockEncrypt file write at {}", block);
-        try_disk!(self.file.seek(SeekFrom::Start((block + self.offset) * BLOCK_SIZE)));
-
         let vec = self.cipher.encrypt(block, buffer);
-        let count = try_disk!(self.file.write(&vec));
 
-        Ok(count)
+        self.file.write_at(block + self.offset, &vec)
     }
 
     fn size(&mut self) -> Result<u64> {
-        let size = try_disk!(self.file.seek(SeekFrom::End(0)));
-        Ok(size)
+        self.file.size()
     }
 }
