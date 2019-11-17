@@ -1,5 +1,5 @@
 use self::cipher::{CipherImpl, XTSCipherImpl};
-use block_modes::{Cbc, Ecb, Pcbc, Xts};
+use block_modes::{Cbc, Ecb, Pcbc};
 use block_modes::block_padding::ZeroPadding;
 use aes::{Aes128, Aes192, Aes256};
 use aesni::{Aes128 as Aesni128, Aes192 as Aesni192, Aes256 as Aesni256};

@@ -11,7 +11,7 @@ pub enum CipherMode {
     XTS,
 }
 
-pub enum IVGeneratorEnum {
+pub enum IVType {
     Plain,
     PlainBE,
     Null,
@@ -28,7 +28,7 @@ pub enum IVGeneratorEnum {
 pub struct EncryptHeader {
     pub encryption_alg: EncryptionAlgorithm,
     pub cipher_mode: CipherMode,
-    pub iv_generator: IVGeneratorEnum,
+    pub iv_generator: IVType,
     pub user_key_salt: [u8; 32],
     pub master_key_encrypted: [u8; 64],
     pub master_key_digest: [u8; 64],

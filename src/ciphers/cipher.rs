@@ -6,9 +6,8 @@ use block_cipher_trait::{BlockCipher};
 use std::marker::PhantomData;
 use generic_array::{GenericArray, ArrayLength};
 use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull, IVGeneratorEnumType};
-use header::IVGeneratorEnum;
-use typenum::{U2, Sum};
-use std::ops::Mul;
+use header::IVType;
+use typenum::Sum;
 
 pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
@@ -20,15 +19,15 @@ pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 
 impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
 {
-    pub fn create(key : &[u8], iv_generator_type : &IVGeneratorEnum) -> Self {
+    pub fn create(key : &[u8], iv_generator_type : &IVType) -> Self {
         let mut key_copy : GenericArray<u8, BC::KeySize> = Default::default();
         let key_len = key_copy.len();
         key_copy[..key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
-            IVGeneratorEnum::Plain => IVPlain::<BC>::create().into(),
-            IVGeneratorEnum::PlainBE => IVPlainBe::<BC>::create().into(),
-            IVGeneratorEnum::Null => IVNull::<BC>::create().into(),
+            IVType::Plain => IVPlain::<BC>::create().into(),
+            IVType::PlainBE => IVPlainBe::<BC>::create().into(),
+            IVType::Null => IVNull::<BC>::create().into(),
             _ => IVEssiv::<BC>::create(&key_copy, iv_generator_type).into()
         };
 
