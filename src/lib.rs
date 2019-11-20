@@ -85,9 +85,10 @@ impl BlockEncrypt {
         // Encrypt master key
         let cipher = BlockEncrypt::get_cipher(&encryption_alg, &cipher_mode, &iv_generator, &user_key);
         let master_key_encrypted_vec = cipher.encrypt(0, &master_key[..key_length]);
+        let enc_key_length = master_key_encrypted_vec.len();
 
         let mut master_key_encrypted= [0u8; 64];
-        master_key_encrypted[..key_length].copy_from_slice(&master_key_encrypted_vec[..key_length]);
+        master_key_encrypted[..enc_key_length].copy_from_slice(&master_key_encrypted_vec[..enc_key_length]);
 
         let header = EncryptHeader {
             encryption_alg,
@@ -127,6 +128,7 @@ impl BlockEncrypt {
         let header = EncryptHeader::deserialize(&buffer);
         let offset = 1;
         let key_length = BlockEncrypt::get_length_of_key(&header.encryption_alg, &header.cipher_mode);
+        let enc_key_length = BlockEncrypt::get_length_of_encrypted_key(&header.encryption_alg, &header.cipher_mode);
 
 
         // Verify password
@@ -136,7 +138,7 @@ impl BlockEncrypt {
         // decrypt master key
         let cipher = BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &user_key);
         let mut master_key = header.master_key_encrypted.clone();
-        cipher.decrypt(0, &mut master_key[..key_length]);
+        cipher.decrypt(0, &mut master_key[..enc_key_length]);
 
         // compare passwords
         let master_key_digest = BlockEncrypt::derive_digest(&master_key[..key_length], &header.master_key_salt, &key_length);
@@ -149,6 +151,7 @@ impl BlockEncrypt {
                 }
             )
         } else {
+            println!("Keylen: {}, EncKeyLen: {}", key_length, enc_key_length);
             eprintln!("Entered candidate key is invalid.");
             Err(Error::new(EIO))
         }
@@ -166,6 +169,19 @@ impl BlockEncrypt {
         match cipher_mode {
             CipherMode::XTS => 2 * length,
             _ =>  length
+        }
+    }
+
+    fn get_length_of_encrypted_key(encryption_alg: &EncryptionAlgorithm, cipher_mode: &CipherMode) -> usize {
+        match cipher_mode {
+            CipherMode::XTS => Self::get_length_of_key(encryption_alg, cipher_mode),
+            _ => {
+                match encryption_alg {
+                    EncryptionAlgorithm::Aes128 => 16,
+                    EncryptionAlgorithm::Aes192 |
+                    EncryptionAlgorithm::Aes256 => 32
+                }
+            }
         }
     }
 

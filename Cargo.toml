@@ -25,7 +25,7 @@ path = "src/lib.rs"
 
 [dependencies]
 redox_syscall = "0.1"
-redoxfs = { path = '../../redoxfs/source' } 
+redoxfs = "0.3.7"
 hex-literal = "0.2.0"
 block-modes = { git = 'https://github.com/tomasritter/block-ciphers/'}
 aes-soft = "0.3.3"
@@ -45,3 +45,4 @@ termion = "1.5.3"
 uuid = { version = "0.5", features = ["v4"] }
 enum_dispatch = "0.1.5"
 aesni = {version = "0.6.0", default-features = false, features = []}
+rand = "0.7.2"

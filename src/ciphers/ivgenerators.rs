@@ -91,7 +91,7 @@ impl <Cipher: BlockCipher> IVEssiv<Cipher>
 {
     pub fn create(key : &[u8], essiv_generator : &IVType) -> Self {
         let mut hashed_key : GenericArray<u8, Cipher::KeySize> = Default::default();
-        let length = Cipher::KeySize::to_usize();
+        let length = hashed_key.len();
         match essiv_generator {
             IVType::EssivSha2_256 => { hashed_key[..length].copy_from_slice(&Sha256::digest(key)[..length]); },
             IVType::EssivSha2_512 => { hashed_key[..length].copy_from_slice(&Sha512::digest(key)[..length]); },

@@ -21,6 +21,7 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC,
 {
     pub fn create(key : &[u8], iv_generator_type : &IVType) -> Self {
         let mut key_copy : GenericArray<u8, BC::KeySize> = Default::default();
+        assert_eq!(key.len(), key_copy.len());
         let key_len = key_copy.len();
         key_copy[..key_len].copy_from_slice(key);
 
