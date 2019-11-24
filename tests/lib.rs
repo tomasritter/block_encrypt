@@ -12,43 +12,13 @@ use std::fs::File;
 use std::io::prelude::*;
 use redoxfs::Disk;
 
-fn get_path_name(encryption_alg: &EncryptionAlgorithm,
-                  cipher_mode: &CipherMode,
-                  iv_generator: &IVType) -> String {
-    let mut s = String::new();
-    s.push_str(match encryption_alg {
-        Aes128 => "Aes128_",
-        Aes192 => "Aes192_",
-        Aes256 => "Aes256_",
-    });
-
-    s.push_str(match cipher_mode{
-        ECB => "ECB_",
-        CBC => "CBC_",
-        PCBC => "PCBC_",
-        XTS => "XTS_"
-    });
-
-    s.push_str(match iv_generator {
-        Plain => "Plain",
-        PlainBE => "PlainBe",
-        Null => "Null",
-        EssivSha2_256 => "Sha2_256",
-        EssivSha2_512 => "Sha2_512",
-        EssivSha3_256 => "Sha3_256",
-        EssivSha3_512 => "Sha3_512",
-        EssivBlake2b => "Blake2b",
-        EssivBlake2s => "Blake2s",
-        EssivGroestl => "Groestl"
-    });
-    s.push_str(".txt");
-    s
-}
+mod common;
+use common::get_path_name;
 
 fn create_mount_read_write(encryption_alg: EncryptionAlgorithm,
                         cipher_mode: CipherMode,
                         iv_generator: IVType) {
-    let path = get_path_name(&encryption_alg, &cipher_mode, &iv_generator);
+    let path = get_path_name(&encryption_alg, &cipher_mode, &iv_generator) + ".test";
     let mut file = match File::create(&path) {
         Ok(arg) => arg,
         Err(_) => {
@@ -82,12 +52,13 @@ fn create_mount_read_write(encryption_alg: EncryptionAlgorithm,
             panic!();
         }
     };
-
+    
     for i in 1..1000 {
         let sector_id: u64 = rng.gen_range(0, 262140);
         let mut buffer_in = [0u8; 4096];
         rng.fill_bytes(&mut buffer_in);
         block_enc.write_at(sector_id, &buffer_in);
+
         let mut buffer_out = [0u8; 4096];
         block_enc.read_at(sector_id, &mut buffer_out);
         assert_eq!(buffer_in[..4096], buffer_out[..4096]);
@@ -95,6 +66,7 @@ fn create_mount_read_write(encryption_alg: EncryptionAlgorithm,
 
     std::fs::remove_file(path);
 }
+
 
 #[cfg(test)]
 mod tests {
