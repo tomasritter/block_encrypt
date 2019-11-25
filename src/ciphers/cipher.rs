@@ -17,7 +17,7 @@ pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
     cipher_impl : PhantomData<C>
 }
 
-impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
+impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVType) -> Self {
         let mut key_copy : GenericArray<u8, BC::KeySize> = Default::default();
@@ -45,7 +45,7 @@ impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC,
     }
 }
 
-impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for CipherImpl<BC, C>
+impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for CipherImpl<BC, C>
 {
     fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8> {
         let c = C::new_var(&self.key, &self.get_iv(block)).unwrap();
@@ -70,7 +70,7 @@ where BC::KeySize: std::ops::Add,
     cipher_type: PhantomData<BC>
 }
 
-impl <BC: 'static + BlockCipher> XTSCipherImpl<BC>
+impl <BC: BlockCipher> XTSCipherImpl<BC>
 where BC::KeySize: std::ops::Add,
       <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
 {
@@ -87,7 +87,7 @@ where BC::KeySize: std::ops::Add,
     }
 }
 
-impl <BC : 'static + BlockCipher> Cipher for XTSCipherImpl<BC>
+impl <BC : BlockCipher> Cipher for XTSCipherImpl<BC>
 where BC::KeySize: std::ops::Add,
       <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
 {
