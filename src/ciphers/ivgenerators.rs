@@ -7,7 +7,6 @@ use sha2::{Sha256, Sha512};
 use sha3::{Sha3_256, Sha3_512};
 use groestl::{Groestl256};
 use block_cipher_trait::BlockCipher;
-use typenum::{Unsigned};
 use header::IVType;
 use enum_dispatch::enum_dispatch;
 
@@ -46,7 +45,7 @@ impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVPlain<Cipher> {
             LittleEndian::write_u128(&mut buf, block as u128);
         }
         else {
-            assert!(false);
+            unreachable!();
         }
         buf
     }
@@ -74,7 +73,7 @@ impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVPlainBe<Cipher> {
             BigEndian::write_u128(&mut buf, block as u128);
         }
         else {
-            assert!(false);
+            unreachable!();
         }
         buf
     }
@@ -100,7 +99,7 @@ impl <Cipher: BlockCipher> IVEssiv<Cipher>
             IVType::EssivBlake2b => { hashed_key[..length].copy_from_slice(&Blake2b::digest(key)[..length]); },
             IVType::EssivBlake2s => { hashed_key[..length].copy_from_slice(&Blake2s::digest(key)[..length]); },
             IVType::EssivGroestl => { hashed_key[..length].copy_from_slice(&Groestl256::digest(key)[..length]); },
-            _ => assert!(false)
+            _ => unreachable!()
         };
 
         IVEssiv::<Cipher> {

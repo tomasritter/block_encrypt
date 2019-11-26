@@ -27,8 +27,6 @@ use ciphers::{*};
 use rdrand::RdRand;
 use rand_core::RngCore;
 
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write, Seek, SeekFrom};
 use syscall::error::{Error, Result, EIO};
 use std::vec::Vec;
 
@@ -37,6 +35,7 @@ use self::argon2::Variant as ArgonVariant;
 
 use redoxfs::{DiskFile, Disk, BLOCK_SIZE};
 use header::*;
+
 
 pub struct BlockEncrypt {
     file: DiskFile,
@@ -71,13 +70,13 @@ impl BlockEncrypt {
         generator.fill_bytes(&mut master_key_salt);
 
         let key_length = BlockEncrypt::get_length_of_key(&encryption_alg, &cipher_mode);
-        let user_key = BlockEncrypt::derive_digest(&password, &user_key_salt, &key_length);
+        let user_key = BlockEncrypt::derive_digest(&password, &user_key_salt, key_length);
 
         let mut master_key = [0u8; 64];
         generator.fill_bytes(&mut master_key[..key_length]);
 
         // Master key digest
-        let master_key_digest_vec = BlockEncrypt::derive_digest(&master_key[..key_length], &master_key_salt, &key_length);
+        let master_key_digest_vec = BlockEncrypt::derive_digest(&master_key[..key_length], &master_key_salt, key_length);
 
         let mut master_key_digest= [0u8; 64];
         master_key_digest[..key_length].copy_from_slice(&master_key_digest_vec);
@@ -91,6 +90,7 @@ impl BlockEncrypt {
         master_key_encrypted[..enc_key_length].copy_from_slice(&master_key_encrypted_vec[..enc_key_length]);
 
         let header = EncryptHeader {
+            signature: *SIGNATURE,
             encryption_alg,
             cipher_mode,
             iv_generator,
@@ -104,7 +104,7 @@ impl BlockEncrypt {
             Ok(_) => println!("Wrote encryption header to disk"),
             Err(e) => {
                 eprintln!("Coulnd't write encryption header to disk");
-                return Err(Error::new(EIO))
+                return Err(e)
             }
         }
 
@@ -125,6 +125,10 @@ impl BlockEncrypt {
         // Read header from disk
         let mut buffer = [0u8; BLOCK_SIZE as usize];
         file.read_at(0, &mut buffer)?;
+        if *SIGNATURE != buffer[..SIGNATURE.len()] {
+            eprintln!("BlockEncrypt: Header not found");
+            return Err(Error::new(EIO))
+        };
         let header = EncryptHeader::deserialize(&buffer);
         let offset = 1;
         let key_length = BlockEncrypt::get_length_of_key(&header.encryption_alg, &header.cipher_mode);
@@ -133,15 +137,15 @@ impl BlockEncrypt {
 
         // Verify password
         // derive user key
-        let user_key = BlockEncrypt::derive_digest(&password, &header.user_key_salt, &key_length);
+        let user_key = BlockEncrypt::derive_digest(&password, &header.user_key_salt, key_length);
 
         // decrypt master key
         let cipher = BlockEncrypt::get_cipher(&header.encryption_alg, &header.cipher_mode, &header.iv_generator, &user_key);
-        let mut master_key = header.master_key_encrypted.clone();
+        let mut master_key = header.master_key_encrypted; // clone
         cipher.decrypt(0, &mut master_key[..enc_key_length]);
 
         // compare passwords
-        let master_key_digest = BlockEncrypt::derive_digest(&master_key[..key_length], &header.master_key_salt, &key_length);
+        let master_key_digest = BlockEncrypt::derive_digest(&master_key[..key_length], &header.master_key_salt, key_length);
         if master_key_digest == header.master_key_digest[..key_length].to_vec() {
             Ok(
                 BlockEncrypt {
@@ -185,10 +189,10 @@ impl BlockEncrypt {
         }
     }
 
-    fn derive_digest(password: &[u8], salt: &[u8], hash_length: &usize) -> Vec<u8> {
+    fn derive_digest(password: &[u8], salt: &[u8], hash_length: usize) -> Vec<u8> {
         let mut config = ArgonConfig::default();
         config.variant = ArgonVariant::Argon2i;
-        config.hash_length = *hash_length as u32;
+        config.hash_length = hash_length as u32;
 
         argon2::hash_raw(password, salt, &config).unwrap()
     }

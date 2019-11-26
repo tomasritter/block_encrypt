@@ -45,4 +45,5 @@ termion = "1.5.3"
 uuid = { version = "0.5", features = ["v4"] }
 enum_dispatch = "0.1.5"
 aesni = {version = "0.6.0", default-features = false, features = []}
-rand = "0.7.2" 
+rand = "0.7.2"
+bincode = "1.2.0"

@@ -42,7 +42,7 @@ fn setsig() {
 
 #[cfg(not(target_os = "redox"))]
 fn setsig() {
-    ()
+
 }
 
 #[cfg(not(target_os = "redox"))]
@@ -147,7 +147,7 @@ fn main() {
             drop(write);
 
             let mut res = [0];
-            read.read(&mut res).unwrap();
+            read.read_exact(&mut res).unwrap();
 
             process::exit(res[0] as i32);
         } else {

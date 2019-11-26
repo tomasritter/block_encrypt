@@ -1,3 +1,4 @@
+pub const SIGNATURE: &'static [u8; 13] = b"BlockEncrypt\0";
 pub enum EncryptionAlgorithm {
     Aes128,
     Aes192,
@@ -26,6 +27,7 @@ pub enum IVType {
 
 #[repr(C, align(4096))] // Align to the size of the block
 pub struct EncryptHeader {
+    pub signature: [u8; SIGNATURE.len()],
     pub encryption_alg: EncryptionAlgorithm,
     pub cipher_mode: CipherMode,
     pub iv_generator: IVType,

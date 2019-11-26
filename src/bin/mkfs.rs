@@ -3,8 +3,8 @@ extern crate uuid;
 extern crate block_encrypt;
 extern crate termion;
 
-use std::{env, fs, process, time};
-use std::io::{Read, Write, stdout, stdin};
+use std::{env, process, time};
+use std::io::{Write, stdout, stdin};
 
 use termion::input::TermRead;
 use redoxfs::FileSystem;
