@@ -1,4 +1,6 @@
 pub const SIGNATURE: &'static [u8; 13] = b"BlockEncrypt\0";
+// Not needed when compiling on Linux with stable, Redox uses older compiler at the moment of writing this comment
+pub const SIG_LEN: usize = 13;
 pub enum EncryptionAlgorithm {
     Aes128,
     Aes192,
@@ -27,7 +29,7 @@ pub enum IVType {
 
 #[repr(C, align(4096))] // Align to the size of the block
 pub struct EncryptHeader {
-    pub signature: [u8; SIGNATURE.len()],
+    pub signature: [u8; SIG_LEN],
     pub encryption_alg: EncryptionAlgorithm,
     pub cipher_mode: CipherMode,
     pub iv_generator: IVType,
