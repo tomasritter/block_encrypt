@@ -49,14 +49,14 @@ impl EncryptHeader {
     unsafe fn u8_as_any_slice<T: Sized>(p: &[u8]) -> &T {
         &::std::slice::from_raw_parts(
             (p as *const [u8])as *const T,
-            ::std::mem::size_of::<T>(),
+            ::std::mem::size_of::<T>()
         )[0]
     }
 
     unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
         ::std::slice::from_raw_parts(
             (p as *const T) as *const u8,
-            ::std::mem::size_of::<T>(),
+            ::std::mem::size_of::<T>()
         )
     }
 
