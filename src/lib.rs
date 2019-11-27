@@ -19,13 +19,17 @@ extern crate sha2;
 extern crate sha3;
 extern crate groestl;
 extern crate aesni;
+extern crate rand_chacha;
 
 mod ciphers;
 pub mod header;
 
 use ciphers::{*};
-use rdrand::RdRand;
-use rand_core::RngCore;
+use rdrand::RdSeed;
+use rand_core::RngCore as RdSeedCore;
+use rand_chacha::ChaCha20Rng;
+use rand_chacha::rand_core::{SeedableRng, RngCore};
+
 
 use syscall::error::{Error, Result, EIO};
 use std::vec::Vec;
@@ -54,13 +58,18 @@ impl BlockEncrypt {
                          password: &[u8])
                          -> Result<BlockEncrypt> {
         println!("Creating encrypted filesystem {} ", path);
-        let mut generator = match RdRand::new() {
-            Ok(gen) => gen,
+        let mut seed_engine = match RdSeed::new() {
+            Ok(seed) => seed,
             Err(_) => {
-                eprintln!("Rdrand not supported on your machine.");
+                eprintln!("Rdseed could not be accessed.");
                 return Err(Error::new(EIO))
             }
         };
+
+        let mut seed : <ChaCha20Rng as SeedableRng>::Seed = [0u8; 32];
+        seed_engine.fill_bytes(&mut seed);
+
+        let mut generator = ChaCha20Rng::from_seed(seed);
 
         let mut file = DiskFile::open(path)?;
         let mut user_key_salt = [0u8; 32];
