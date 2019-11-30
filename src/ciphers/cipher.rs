@@ -12,12 +12,12 @@ use typenum::Sum;
 pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
 {
     key : GenericArray<u8, BC::KeySize>,
-    iv_generator : IVGeneratorEnumType<BC>,
+    iv_generator : IVGeneratorEnumType<BC::BlockSize>,
     cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
 }
 
-impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
+impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVType) -> Self {
         let mut key_copy : GenericArray<u8, BC::KeySize> = Default::default();
@@ -26,9 +26,9 @@ impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
         key_copy[..key_len].copy_from_slice(key);
 
         let iv_generator = match iv_generator_type {
-            IVType::Plain => IVPlain::<BC>::create().into(),
-            IVType::PlainBE => IVPlainBe::<BC>::create().into(),
-            IVType::Null => IVNull::<BC>::create().into(),
+            IVType::Plain => IVPlain::<BC::BlockSize>::create().into(),
+            IVType::PlainBE => IVPlainBe::<BC::BlockSize>::create().into(),
+            IVType::Null => IVNull::<BC::BlockSize>::create().into(),
             _ => IVEssiv::<BC>::create(&key_copy, iv_generator_type).into()
         };
 
@@ -45,7 +45,7 @@ impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
     }
 }
 
-impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for CipherImpl<BC, C>
+impl <BC : 'static + BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for CipherImpl<BC, C>
 {
     fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8> {
         let c = C::new_var(&self.key, &self.get_iv(block)).unwrap();
@@ -66,7 +66,7 @@ where BC::KeySize: std::ops::Add,
     <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
 {
     key: GenericArray<u8, Sum<BC::KeySize, BC::KeySize>>,
-    iv_generator: IVPlain<BC>,
+    iv_generator: IVPlain<BC::BlockSize>,
     cipher_type: PhantomData<BC>
 }
 
@@ -81,7 +81,7 @@ where BC::KeySize: std::ops::Add,
 
         XTSCipherImpl::<BC> {
             key: key_copy,
-            iv_generator : IVPlain::<BC>::create(),
+            iv_generator : IVPlain::<BC::BlockSize>::create(),
             cipher_type: Default::default()
         }
     }

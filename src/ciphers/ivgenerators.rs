@@ -1,5 +1,5 @@
 use byteorder::{ByteOrder, LittleEndian, BigEndian};
-use generic_array::{GenericArray};
+use generic_array::{GenericArray, ArrayLength};
 use std::marker::PhantomData;
 use digest::Digest;
 use blake2::{Blake2b, Blake2s};
@@ -9,35 +9,42 @@ use groestl::{Groestl256};
 use block_cipher_trait::BlockCipher;
 use header::IVType;
 use enum_dispatch::enum_dispatch;
+use aes::{Aes128, Aes192, Aes256};
+use aesni::{Aes128 as Aesni128, Aes192 as Aesni192, Aes256 as Aesni256};
 
 #[enum_dispatch(IVGeneratorEnumType)]
-pub trait IVGenerator<Cipher : BlockCipher> {
-    fn getiv(&self, block : u64) -> GenericArray<u8, Cipher::BlockSize>;
+pub trait IVGenerator<BlockSize : ArrayLength<u8>> {
+    fn getiv(&self, block : u64) -> GenericArray<u8, BlockSize>;
 }
 
 #[enum_dispatch]
-pub enum IVGeneratorEnumType<Cipher : BlockCipher> {
-    Plain(IVPlain<Cipher>),
-    PlainBe(IVPlainBe<Cipher>),
-    Null(IVNull<Cipher>),
-    Essiv(IVEssiv<Cipher>),
+pub enum IVGeneratorEnumType<BlockSize : ArrayLength<u8>> {
+    Plain(IVPlain<BlockSize>),
+    PlainBe(IVPlainBe<BlockSize>),
+    Null(IVNull<BlockSize>),
+    EssivAes128(IVEssiv<Aes128>),
+    EssivAes192(IVEssiv<Aes192>),
+    EssivAes256(IVEssiv<Aes256>),
+    EssivAesni128(IVEssiv<Aesni128>),
+    EssivAesni192(IVEssiv<Aesni192>),
+    EssivAesni256(IVEssiv<Aesni256>),
 }
 
-pub struct IVPlain<Cipher : BlockCipher> {
-    ivlength : PhantomData<Cipher>
+pub struct IVPlain<BlockSize : ArrayLength<u8>> {
+    ivlength : PhantomData<BlockSize>
 }
 
-impl <Cipher : BlockCipher> IVPlain<Cipher> {
+impl <BlockSize : ArrayLength<u8>> IVPlain<BlockSize> {
     pub fn create() -> Self {
-        IVPlain::<Cipher> {
+        IVPlain::<BlockSize> {
             ivlength : Default::default()
         }
     }
 }
 
-impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVPlain<Cipher> {
-    fn getiv(&self, block : u64) -> GenericArray<u8, Cipher::BlockSize> {
-        let mut buf : GenericArray<u8, Cipher::BlockSize> = Default::default();
+impl <BlockSize : ArrayLength<u8>> IVGenerator<BlockSize> for IVPlain<BlockSize> {
+    fn getiv(&self, block : u64) -> GenericArray<u8, BlockSize> {
+        let mut buf : GenericArray<u8, BlockSize> = Default::default();
         if buf.len() == 8 {
             LittleEndian::write_u64(&mut buf, block);
         }
@@ -51,21 +58,21 @@ impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVPlain<Cipher> {
     }
 }
 
-pub struct IVPlainBe<Cipher : BlockCipher> {
-    ivlength : PhantomData<Cipher>
+pub struct IVPlainBe<BlockSize : ArrayLength<u8>> {
+    ivlength : PhantomData<BlockSize>
 }
 
-impl <Cipher : BlockCipher> IVPlainBe<Cipher> {
+impl <BlockSize : ArrayLength<u8>> IVPlainBe<BlockSize> {
     pub fn create() -> Self {
-        IVPlainBe::<Cipher> {
+        IVPlainBe::<BlockSize> {
             ivlength : Default::default()
         }
     }
 }
 
-impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVPlainBe<Cipher> {
-    fn getiv(&self, block : u64) -> GenericArray<u8, Cipher::BlockSize> {
-        let mut buf : GenericArray<u8, Cipher::BlockSize> = Default::default();
+impl <BlockSize : ArrayLength<u8>> IVGenerator<BlockSize> for IVPlainBe<BlockSize> {
+    fn getiv(&self, block : u64) -> GenericArray<u8, BlockSize> {
+        let mut buf : GenericArray<u8, BlockSize> = Default::default();
         if buf.len() == 8 {
             BigEndian::write_u64(&mut buf, block);
         }
@@ -82,7 +89,7 @@ impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVPlainBe<Cipher> {
 pub struct IVEssiv<Cipher: BlockCipher>
 {
     hashed_key: GenericArray<u8, Cipher::KeySize>,
-    plain_gen: IVPlain<Cipher>,
+    plain_gen: IVPlain<Cipher::BlockSize>,
     cipher_type: PhantomData<Cipher>
 }
 
@@ -104,14 +111,14 @@ impl <Cipher: BlockCipher> IVEssiv<Cipher>
 
         IVEssiv::<Cipher> {
             hashed_key,
-            plain_gen : IVPlain::<Cipher>::create(),
+            plain_gen : IVPlain::<Cipher::BlockSize>::create(),
             cipher_type: Default::default()
         }
 
     }
 }
 
-impl <Cipher: BlockCipher> IVGenerator<Cipher> for IVEssiv<Cipher> {
+impl <Cipher: BlockCipher> IVGenerator<Cipher::BlockSize> for IVEssiv<Cipher> {
     fn getiv(&self, block : u64) -> GenericArray<u8, Cipher::BlockSize> {
         let mut iv = self.plain_gen.getiv(block);
         let cipher = Cipher::new(&self.hashed_key);
@@ -120,21 +127,21 @@ impl <Cipher: BlockCipher> IVGenerator<Cipher> for IVEssiv<Cipher> {
     }
 }
 
-pub struct IVNull<Cipher : BlockCipher> {
-    ivlength : PhantomData<Cipher>
+pub struct IVNull<BlockSize : ArrayLength<u8>> {
+    ivlength : PhantomData<BlockSize>
 }
 
-impl <Cipher : BlockCipher> IVNull<Cipher> {
+impl <BlockSize : ArrayLength<u8>> IVNull<BlockSize> {
     pub fn create() -> Self {
-        IVNull::<Cipher> {
+        IVNull::<BlockSize> {
             ivlength : Default::default()
         }
     }
 }
 
-impl <Cipher : BlockCipher> IVGenerator<Cipher> for IVNull<Cipher> {
-    fn getiv(&self, _block: u64) -> GenericArray<u8, Cipher::BlockSize> {
-        let mut buf : GenericArray<u8, Cipher::BlockSize> = Default::default();
+impl <BlockSize : ArrayLength<u8>> IVGenerator<BlockSize> for IVNull<BlockSize> {
+    fn getiv(&self, _block: u64) -> GenericArray<u8, BlockSize> {
+        let mut buf : GenericArray<u8, BlockSize> = Default::default();
         buf.iter_mut().for_each(|x| *x = 0);
         buf
     }
