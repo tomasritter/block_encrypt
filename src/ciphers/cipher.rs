@@ -13,7 +13,6 @@ pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, NoPadding>>
 {
     key : GenericArray<u8, BC::KeySize>,
     iv_generator : IVGeneratorEnumType<BC>,
-    cipher_type : PhantomData<BC>,
     cipher_impl : PhantomData<C>
 }
 
@@ -35,7 +34,6 @@ impl <BC : BlockCipher, C : BlockMode<BC, NoPadding>> CipherImpl<BC, C>
         CipherImpl::<BC, C> {
             key: key_copy,
             iv_generator,
-            cipher_type : Default::default(),
             cipher_impl : Default::default()
         }
     }
@@ -66,8 +64,7 @@ where BC::KeySize: std::ops::Add,
     <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
 {
     key: GenericArray<u8, Sum<BC::KeySize, BC::KeySize>>,
-    iv_generator: IVPlain<BC>,
-    cipher_type: PhantomData<BC>
+    iv_generator: IVPlain<BC>
 }
 
 impl <BC: BlockCipher> XTSCipherImpl<BC>
@@ -81,8 +78,7 @@ where BC::KeySize: std::ops::Add,
 
         XTSCipherImpl::<BC> {
             key: key_copy,
-            iv_generator : IVPlain::<BC>::create(),
-            cipher_type: Default::default()
+            iv_generator : IVPlain::<BC>::create()
         }
     }
 }

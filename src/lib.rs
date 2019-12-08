@@ -211,6 +211,7 @@ impl BlockEncrypt {
 
         match encryption_alg {
             EncryptionAlgorithm::Aes128 => {
+                // Runtime support for aesni
                 if is_x86_feature_detected!("aes") {
                     match cipher_mode {
                         CipherMode::CBC => Aesni128Cbc::create(master_key, iv_generator).into(),
