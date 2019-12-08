@@ -18,7 +18,8 @@ fn parse_encryption_algorithm(s: &str) -> EncryptionAlgorithm {
         "aes192" => EncryptionAlgorithm::Aes192,
         "aes256" => EncryptionAlgorithm::Aes256,
         _ => {
-            println!("redoxfs-mkfs-enc: failed to read encryption algorithm type");
+            println!("block_encrypt-mkfs: failed to read encryption algorithm type");
+            usage();
             process::exit(1);
         }
     }
@@ -31,7 +32,8 @@ fn parse_cipher_mode(s: &str) -> CipherMode {
         "pcbc" => CipherMode::PCBC,
         "xts" => CipherMode::XTS,
         _ => {
-            println!("redoxfs-mkfs-enc: failed to read cipher mode type");
+            println!("block_encrypt-mkfs: failed to read cipher mode type");
+            usage();
             process::exit(1);
         }
     }
@@ -41,7 +43,7 @@ fn parse_ivgenerator(s: &str) -> IVType {
     if s.starts_with("essiv") {
         let mut split = s.splitn(2, ':');
         if split.next().unwrap() != "essiv" {
-            println!("redoxfs-mkfs-enc: failed to read iv generator type");
+            println!("block_encrypt-mkfs: failed to read iv generator type");
             process::exit(1);
         } else {
             match split.next() {
@@ -55,13 +57,15 @@ fn parse_ivgenerator(s: &str) -> IVType {
                         "blake2s" => IVType::EssivBlake2s,
                         "groestl" => IVType::EssivGroestl,
                         _ => {
-                            println!("redoxfs-mkfs-enc: failed to read iv generator type");
+                            println!("block_encrypt-mkfs: failed to read iv generator type");
+                            usage();
                             process::exit(1);
                         }
                     }
                 }
                 None => {
-                    println!("redoxfs-mkfs-enc: failed to read iv generator type");
+                    println!("block_encrypt-mkfs: failed to read iv generator type");
+                    usage();
                     process::exit(1);
                 }
             }
@@ -72,11 +76,21 @@ fn parse_ivgenerator(s: &str) -> IVType {
             "plainbe" => IVType::PlainBE,
             "null" => IVType::Null,
             _ => {
-                println!("redoxfs-mkfs-enc: failed to read iv generator type");
+                println!("block_encrypt-mkfs: failed to read iv generator type");
+                usage();
                 process::exit(1);
             }
         }
     }
+}
+
+fn usage() {
+    println!("Usage:");
+    println!("block_encrypt-mkfs DISK ENC_ALGORITHM CIPHER_MODE IVGENERATOR");
+    println!("encryption algorithms: aes128 | aes192 | aes256");
+    println!("cipher modes: ecb | cbc | pcbc | xts");
+    println!("initialization vectors: plain | plainbe | null | essiv:[hash function]");
+    println!("essiv options: sha2-256 | sha2-512 | sha3-256 | sha3-512 | blake2b | blake2s | groestl");
 }
 
 fn main() {
@@ -85,15 +99,16 @@ fn main() {
     let disk_path = if let Some(path) = args.next() {
         path
     } else {
-        println!("redoxfs-mkfs-enc: no disk image provided");
-        println!("redoxfs-mkfs-enc DISK ENC_ALGORITHM CIPHER_MODE IVGENERATOR");
+        println!("block_encrypt-mkfs: no disk image provided");
+        usage();
         process::exit(1);
     };
 
     let encryption_alg = match args.next() {
         Some(arg) => parse_encryption_algorithm(&arg),
         None => {
-            println!("redoxfs-mkfs-enc: encryption algorithm type not provided");
+            println!("block_encrypt-mkfs: encryption algorithm type not provided");
+            usage();
             process::exit(1);
         }
     };
@@ -101,7 +116,8 @@ fn main() {
     let cipher_mode = match args.next() {
         Some(arg) => parse_cipher_mode(&arg),
         None => {
-            println!("redoxfs-mkfs-enc: cipher mode not provided");
+            println!("block_encrypt-mkfs: cipher mode not provided");
+            usage();
             process::exit(1);
         }
     };
@@ -109,7 +125,8 @@ fn main() {
     let iv_generator = match args.next() {
         Some(arg) => parse_ivgenerator(&arg),
         None => {
-            println!("redoxfs-mkfs-enc: initialization vector generator not provided");
+            println!("block_encrypt-mkfs: initialization vector generator not provided");
+            usage();
             process::exit(1);
         }
     };
@@ -159,7 +176,7 @@ fn main() {
                                                  cipher_mode, iv_generator, p) {
         Ok(disk) => disk,
         Err(err) => {
-            println!("redoxfs-mkfs-enc: failed to open image {}: {}", disk_path, err);
+            println!("block_encrypt-mkfs: failed to open image {}: {}", disk_path, err);
             process::exit(1);
         }
     };
@@ -168,10 +185,10 @@ fn main() {
     match FileSystem::create_reserved(disk, &[],ctime.as_secs(), ctime.subsec_nanos()) {
         Ok(filesystem) => {
             let uuid = Uuid::from_bytes(&filesystem.header.1.uuid).unwrap();
-            println!("redoxfs-mkfs-enc: created filesystem on {}, reserved {} blocks, size {} MB, uuid {}", disk_path, filesystem.block, filesystem.header.1.size/1000/1000, uuid.hyphenated());
+            println!("block_encrypt-mkfs: created filesystem on {}, reserved {} blocks, size {} MB, uuid {}", disk_path, filesystem.block, filesystem.header.1.size/1000/1000, uuid.hyphenated());
         },
         Err(err) => {
-            println!("redoxfs-mkfs-enc: failed to create filesystem on {}: {}", disk_path, err);
+            println!("block_encrypt-mkfs: failed to create filesystem on {}: {}", disk_path, err);
             process::exit(1);
         }
     }

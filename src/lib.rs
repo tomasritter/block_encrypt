@@ -79,6 +79,7 @@ impl BlockEncrypt {
         generator.fill_bytes(&mut master_key_salt);
 
         let key_length = BlockEncrypt::get_length_of_key(&encryption_alg, &cipher_mode);
+        let enc_key_length = BlockEncrypt::get_length_of_encrypted_key(&encryption_alg, &cipher_mode);
         let user_key = BlockEncrypt::derive_digest(&password, &user_key_salt, key_length);
 
         let mut master_key = [0u8; 64];
@@ -92,8 +93,7 @@ impl BlockEncrypt {
 
         // Encrypt master key
         let cipher = BlockEncrypt::get_cipher(&encryption_alg, &cipher_mode, &iv_generator, &user_key);
-        let master_key_encrypted_vec = cipher.encrypt(0, &master_key[..key_length]);
-        let enc_key_length = master_key_encrypted_vec.len();
+        let master_key_encrypted_vec = cipher.encrypt(0, &master_key[..enc_key_length]);
 
         let mut master_key_encrypted= [0u8; 64];
         master_key_encrypted[..enc_key_length].copy_from_slice(&master_key_encrypted_vec[..enc_key_length]);
@@ -267,16 +267,13 @@ impl BlockEncrypt {
 
 impl Disk for BlockEncrypt {
     fn read_at(&mut self, block: u64, buffer: &mut [u8]) -> Result<usize> {
-        println!("BlockEncrypt file read at {}", block);
         let count = self.file.read_at(block + self.offset, buffer)?;
         self.cipher.decrypt(block, buffer);
         Ok(count)
     }
 
     fn write_at(&mut self, block: u64, buffer: &[u8]) -> Result<usize> {
-        println!("BlockEncrypt file write at {}", block);
         let vec = self.cipher.encrypt(block, buffer);
-
         self.file.write_at(block + self.offset, &vec)
     }
 

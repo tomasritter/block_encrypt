@@ -1,6 +1,6 @@
 use ciphers::Cipher;
 use block_modes::{BlockMode, Xts};
-use block_modes::block_padding::ZeroPadding;
+use block_modes::block_padding::NoPadding;
 use std::vec::Vec;
 use block_cipher_trait::{BlockCipher};
 use std::marker::PhantomData;
@@ -9,7 +9,7 @@ use super::ivgenerators::{IVGenerator, IVPlain, IVPlainBe, IVEssiv, IVNull, IVGe
 use header::IVType;
 use typenum::Sum;
 
-pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
+pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, NoPadding>>
 {
     key : GenericArray<u8, BC::KeySize>,
     iv_generator : IVGeneratorEnumType<BC>,
@@ -17,7 +17,7 @@ pub struct CipherImpl<BC : BlockCipher, C : BlockMode<BC, ZeroPadding>>
     cipher_impl : PhantomData<C>
 }
 
-impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
+impl <BC : BlockCipher, C : BlockMode<BC, NoPadding>> CipherImpl<BC, C>
 {
     pub fn create(key : &[u8], iv_generator_type : &IVType) -> Self {
         let mut key_copy : GenericArray<u8, BC::KeySize> = Default::default();
@@ -45,7 +45,7 @@ impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> CipherImpl<BC, C>
     }
 }
 
-impl <BC : BlockCipher, C : BlockMode<BC, ZeroPadding>> Cipher for CipherImpl<BC, C>
+impl <BC : BlockCipher, C : BlockMode<BC, NoPadding>> Cipher for CipherImpl<BC, C>
 {
     fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8> {
         let c = C::new_var(&self.key, &self.get_iv(block)).unwrap();
@@ -92,12 +92,12 @@ where BC::KeySize: std::ops::Add,
       <BC::KeySize as std::ops::Add>::Output: ArrayLength<u8>
 {
     fn encrypt(&self, block : u64, buffer : &[u8]) -> Vec<u8> {
-        let c = Xts::<BC, ZeroPadding>::new_var(&self.key, &self.iv_generator.getiv(block)).unwrap();
+        let c = Xts::<BC, NoPadding>::new_var(&self.key, &self.iv_generator.getiv(block)).unwrap();
         c.encrypt_vec(buffer)
     }
 
     fn decrypt(&self, block : u64, buffer : &mut [u8]) {
-        let c = Xts::<BC, ZeroPadding>::new_var(&self.key, &self.iv_generator.getiv(block)).unwrap();
+        let c = Xts::<BC, NoPadding>::new_var(&self.key, &self.iv_generator.getiv(block)).unwrap();
         c.decrypt(buffer).unwrap();
     }
 }
